@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'nonce-herdrdesk-xterm'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>HerdrDesk</title>
+<link rel="stylesheet" href="vendor/xterm.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top"><span id="connection" role="status"></span><button type="button" id="alertCount" hidden></button><details class="settings"><summary data-copy="settings"></summary><div class="settings-menu">
+ <div class="extra-views"><button data-view="conversations" data-copy="conversations" hidden></button><button data-view="overview" data-copy="viewOverview"></button><button data-view="structure" data-copy="viewStructure"></button><button data-view="handoff" data-copy="viewHandoff"></button><button data-view="work" data-copy="viewWork"></button></div>
+ <button id="hiddenChatsToggle" type="button" aria-pressed="false" hidden></button>
+ <label for="language" data-copy="language">Language</label><select id="language"><option value="en">English</option><option value="ko">한국어</option><option value="ja">日本語</option></select>
+ <label class="sound-toggle"><input id="automaticChat" type="checkbox" checked><span data-copy="automaticChat"></span></label>
+ <label class="sound-toggle"><input id="soundEnabled" type="checkbox"><span data-copy="soundEffects"></span></label>
+ <div class="sound-picks">
+  <label><span data-copy="soundDone"></span><select id="soundDone" data-sound="done"></select></label>
+  <label><span data-copy="soundHandoff"></span><select id="soundHandoff" data-sound="handoff"></select></label>
+  <label><span data-copy="soundAttention"></span><select id="soundAttention" data-sound="attention"></select></label>
+ </div>
+ <div class="controls"><button data-action="configure" data-copy="chooseCore"></button><button data-action="refresh" data-copy="refresh"></button></div>
+ </div></details></header>
+<section id="waitingInbox" class="waiting-inbox" aria-labelledby="waitingInboxTitle" hidden><header><h2 id="waitingInboxTitle" data-copy="waitingInbox"></h2><span id="waitingInboxCount" role="status"></span></header><div id="waitingInboxList"></div></section>
+<main data-page="conversations">
+ <div id="arrival" class="arrival" hidden><span id="arrivalSheep" aria-hidden="true"></span><div><strong id="arrivalTitle" role="status"></strong><span id="arrivalFrom"></span></div><button type="button" id="arrivalOpen"></button><button type="button" id="arrivalDismiss" aria-label="Close">×</button></div>
+ <header class="heading"><h1 data-copy="overview"></h1></header>
+ <div class="notice" id="notice" role="status" hidden></div>
+ <div id="metrics" class="metrics"></div>
+ <div class="layout">
+  <aside id="roomNav" class="panel">
+   <div id="pinDropHint" hidden><span aria-hidden="true">⌖</span> <span data-copy="dropToPin"></span></div>
+   <div id="pinnedChats" role="group" hidden></div>
+   <div id="roomList" tabindex="0"></div>
+   <div id="computerStrip" class="computer-strip"></div>
+  </aside>
+  <section id="directoryPanel" hidden>
+   <div class="directory-meta"><span id="directoryCount"></span><span id="directoryMachines"></span></div>
+   <div id="directoryHQ"></div><div id="directoryGroups"></div>
+  </section>
+  <div class="stack dashboard">
+   <section class="panel org" id="orgPanel"><header><h2 data-copy="structure"></h2><div class="org-tools"><span id="scope"></span><div class="pager" id="teamPager" hidden><button type="button" data-team-page="-1">‹</button><output id="teamPage"></output><button type="button" data-team-page="1">›</button></div></div></header><div class="content" id="structure"></div></section>
+   <section class="panel" id="workPanel" hidden><header><h2 data-copy="viewWork"></h2></header><div class="content" id="workList"></div></section>
+   <section class="panel" id="routePanel"><header><h2 data-copy="routeTitle"></h2><div class="org-tools"><span id="routeName"></span><button type="button" id="replay" disabled>↻</button></div></header>
+    <div class="content"><div class="flow-head"><div class="task-list" id="taskList"></div></div><div id="lanes"></div></div>
+   </section>
+  </div>
+  <div class="stack side">
+  <section class="panel detail">
+   <header><h2 data-copy="selection"></h2><div class="org-tools"><span id="sessionState"></span><button type="button" id="directoryClose" hidden>×</button></div></header>
+   <div class="content"><div class="identity"><span class="avatar" id="targetAvatar" aria-hidden="true">·</span><button class="character-avatar-button" id="characterEdit" type="button" aria-haspopup="dialog" hidden></button><div><h3 id="targetTitle"></h3><p class="target-path" id="targetPath"></p><p class="target-path" id="launchModel"></p></div><div class="room-tools" id="roomTools" hidden><button id="terminalToggle" type="button" data-copy="terminal" aria-controls="terminal" aria-expanded="false"></button><button id="roomMembersToggle" type="button" aria-controls="groupMembers" aria-expanded="false" hidden></button><button id="roomBack" type="button" data-copy="backToGroup" hidden></button></div></div>
+    <aside id="groupMembers" class="group-members" hidden aria-label="Members"></aside>
+    <nav id="tabs"><button type="button" data-tab="chat" data-copy="chat"></button><button type="button" data-tab="team" data-copy="teamActivity" hidden></button><button type="button" data-tab="terminal" data-copy="terminal"></button><button type="button" data-tab="activity" data-copy="activity"></button><button type="button" data-tab="questions" hidden></button></nav>
+    <div id="chat"><details id="chatHistory" tabindex="0" hidden><summary id="historyLabel"></summary><div id="chatTranscript"><div id="chatLog" aria-live="polite"></div>
+      <div id="inlineHandoff" hidden></div>
+      <div id="agentActivity" class="agent-activity" hidden>
+       <span id="activitySheep" aria-hidden="true"></span><span id="agentActivityText" role="status"></span>
+      </div>
+      </div></details>
+     <div id="inlineApproval" hidden></div>
+     <div id="taskBoard" class="task-board" hidden></div>
+     <div id="roomFeed" hidden tabindex="0"></div>
+     <div id="groupActivity" class="agent-activity" hidden></div>
+     <div id="handoffRail" class="handoff-rail" hidden></div>
+     <form id="composer"><label for="draft" data-copy="assign"></label><textarea id="draft" maxlength="2000" rows="4"></textarea>
+      <div id="attachmentList" class="attachment-list" hidden></div><div id="attachmentNotice" class="attachment-notice" role="status"></div>
+      <div class="compose-bar"><div class="compose-meta"><span id="recipient"></span><span id="sendStatus" role="status"></span></div><button class="primary" id="send" type="submit" data-copy="send" disabled></button></div></form>
+    </div>
+    <div id="terminal" hidden>
+     <div class="terminal-drawer-head"><div><strong data-copy="terminal"></strong><span id="terminalTarget"></span></div><button id="terminalClose" type="button" data-copy="close"></button></div>
+     <div class="terminal-head"><b id="terminalMode" data-copy="terminalClickToType"></b><span id="terminalStatus" role="status"></span></div>
+     <div id="terminalViewport" tabindex="0"><div id="terminalScreen"></div></div>
+     <div class="terminal-actions"><button id="latest" data-copy="latest" hidden></button><button id="retry" data-copy="retry" hidden></button><button id="open" data-copy="open" disabled></button></div>
+    </div>
+    <div id="transferPanel" hidden><h3 id="logName"></h3><div id="transfers"></div></div>
+    <div id="questionPanel" hidden><div id="questions"></div></div>
+   </div>
+  </section>
+  </div>
+ </div>
+</main>
+<div id="chatContextMenu" class="chat-context-menu" role="menu" hidden></div>
+<dialog id="chatSectionDialog" class="chat-section-dialog" aria-labelledby="chatSectionTitle">
+ <form id="chatSectionForm">
+  <h2 id="chatSectionTitle" data-copy="newChatSection"></h2>
+  <label for="chatSectionName" data-copy="chatSectionName"></label>
+  <input id="chatSectionName" maxlength="36" required>
+  <div><button id="chatSectionCancel" type="button" data-copy="close"></button><button type="submit" class="primary" data-copy="moveChatSection"></button></div>
+ </form>
+</dialog>
+<dialog id="characterDialog" class="character-dialog" aria-labelledby="characterTitle">
+ <header class="character-header">
+  <div><h2 id="characterTitle" data-copy="characterPicker"></h2><p id="characterOwner"></p></div>
+  <button type="button" id="characterClose" data-copy="close"></button>
+ </header>
+ <div class="character-body">
+  <div class="character-stage">
+   <div id="characterHero" class="character-hero"></div>
+   <div class="character-stage-info">
+    <b id="characterSelection" aria-live="polite"></b>
+   </div>
+  </div>
+  <div id="characterGrid" class="character-grid" role="group"></div>
+  <div id="characterCoats" class="character-coats" role="group"></div>
+  <h3 class="character-accessory-label" id="characterAccessoryLabel" data-copy="characterAccessories"></h3>
+  <div id="characterAccessories" class="character-grid character-accessories" role="group" aria-labelledby="characterAccessoryLabel"></div>
+ </div>
+ <footer class="character-footer">
+  <button type="button" id="characterReset" data-copy="characterRestore"></button>
+  <button type="button" class="primary" id="characterSave" data-copy="characterApply"></button>
+ </footer>
+</dialog>
+<script src="vendor/xterm.js"></script>
+<script src="bundle.js"></script>
+</body></html>

@@ -1,0 +1,130 @@
+#!/usr/bin/python3 -I
+"""herdr-ask: a team lead explicitly registers ONE question for the person, on its own terminal.
+
+  herdr-ask open --text "Question" [--choice A --choice B ...] [--ttl-hours 6] [--replace] [--approval-role ROLE]
+  herdr-ask approval <id> --approval-role ROLE   # point your CURRENT question at the terminal awaiting approval
+  herdr-ask approval <id> --clear
+  herdr-ask ack <id>        # the lead confirms it received the person's answer
+  herdr-ask withdraw <id>   # the lead no longer needs an answer
+  herdr-ask status
+
+Only ask.* labels on the caller's own terminal ($HC_TERMINAL_ID) are written. A needs-user
+report is not a question; nothing here reads conversations or answers on anyone's behalf.
+--approval-role only records WHICH registered role (one live AI, bound to its current session)
+the person may open from the question card. It never approves, sends keys or runs anything.
+"""
+import argparse, json, os, secrets, shutil, subprocess, sys
+from datetime import datetime, timedelta, timezone
+
+HC = os.environ.get("HERDR_ASK_HC") or shutil.which("hc") or os.path.expanduser("~/.local/bin/hc")
+AGENT_APPS = {'codex', 'claude-code'}
+BUSY = {'open', 'sending', 'needs-check'}
+ACTIVE = BUSY | {'sent'}            # an approval link may be set while the question is still in play
+
+def hc(*args):
+    r = subprocess.run([HC, *args], capture_output=True, text=True, timeout=30)
+    if r.returncode:
+        raise SystemExit(f'hc {args[0]} failed: {r.stderr.strip() or r.stdout.strip()}')
+    return r.stdout
+
+def me():
+    addr = os.environ.get('HC_TERMINAL_ID')
+    if not addr:
+        raise SystemExit('run this inside your own Herdr terminal (HC_TERMINAL_ID missing)')
+    d = json.loads(hc('get', addr))
+    app = (d.get('status') or {}).get('app')
+    role = (d.get('labels') or {}).get('recovery.role')
+    if app not in AGENT_APPS:
+        raise SystemExit('only a running Codex/Claude agent can ask')
+    if not role:
+        raise SystemExit('this terminal has no recovery.role; register a unique role with hc label first')
+    return d
+
+def session_of(d):
+    return f'{d.get("created_ms")}:{d.get("pid")}'
+
+def is_agent(d):
+    return d.get('state') == 'live' and (d.get('status') or {}).get('app') in AGENT_APPS
+
+def approval_labels(role, d):
+    """Exactly one running AI with that recovery.role (the asker's own role is allowed); bound to its session."""
+    role = one_line(role, 64, '--approval-role')
+    if any(c.isspace() or c == '=' for c in role):
+        raise SystemExit('--approval-role: a recovery.role, not a terminal number or text')
+    lst = json.loads(hc('ls', '--json', '--label', f'recovery.role={role}'))['terminals']
+    ais = [g for g in (json.loads(hc('get', t['address'])) for t in lst) if is_agent(g)
+           and (g.get('labels') or {}).get('recovery.role') == role]
+    if len(ais) != 1:
+        raise SystemExit(f'{role}: {"no running agent" if not ais else "more than one running agent"}; not linked')
+    return [f'ask.approval_role={role}', f'ask.approval_session={session_of(ais[0])}']
+
+def one_line(s, n, what):
+    s = (s or '').strip()
+    if not s or len(s) > n or any(c in s for c in '\r\n\x00'):
+        raise SystemExit(f'{what}: 1–{n} characters, single line')
+    return s
+
+def now():
+    return datetime.now(timezone.utc).replace(microsecond=0)
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest='cmd', required=True)
+    o = sub.add_parser('open'); o.add_argument('--text', required=True); o.add_argument('--choice', action='append', default=[])
+    o.add_argument('--ttl-hours', type=float, default=6); o.add_argument('--replace', action='store_true')
+    o.add_argument('--approval-role')
+    v = sub.add_parser('approval'); v.add_argument('id'); g = v.add_mutually_exclusive_group(required=True)
+    g.add_argument('--approval-role'); g.add_argument('--clear', action='store_true')
+    a = sub.add_parser('ack'); a.add_argument('id')
+    w = sub.add_parser('withdraw'); w.add_argument('id')
+    sub.add_parser('status')
+    args = p.parse_args()
+    d = me()
+    labels, addr = d.get('labels') or {}, d['address']
+    cur_id, cur_state = labels.get('ask.id'), labels.get('ask.state')
+    if args.cmd == 'status':
+        print(json.dumps({k: v for k, v in labels.items() if k.startswith('ask.')}, ensure_ascii=False, indent=1)); return
+    if args.cmd == 'open':
+        if cur_id and cur_state in BUSY and not args.replace:
+            raise SystemExit(f'question {cur_id} is still {cur_state}; withdraw it or pass --replace')
+        if not 0 < args.ttl_hours <= 72:
+            raise SystemExit('--ttl-hours: 0–72')
+        text = one_line(args.text, 500, '--text')
+        choices = [one_line(c, 40, '--choice') for c in args.choice]
+        if len(choices) > 5:
+            raise SystemExit('at most 5 choices')
+        link = approval_labels(args.approval_role, d) if args.approval_role else ['ask.approval_role=', 'ask.approval_session=']
+        qid = 'q' + now().strftime('%Y%m%d%H%M%S') + secrets.token_hex(3)
+        t = now()
+        hc('label', addr, f'ask.id={qid}', f'ask.text={text}', f'ask.choices={json.dumps(choices, ensure_ascii=False)}',
+           f'ask.created={t.isoformat()}', f'ask.expires={(t + timedelta(hours=args.ttl_hours)).isoformat()}',
+           f'ask.session={d.get("created_ms")}:{d.get("pid")}', 'ask.state=open',
+           'ask.answered=', 'ask.sent_turn=', 'ask.acked=', *link)
+        print(json.dumps({'id': qid, 'state': 'open'})); return
+    if args.id != cur_id:
+        raise SystemExit(f'no such current question (current: {cur_id})')
+    if args.cmd == 'ack':
+        if cur_state not in ('sent', 'needs-check'):
+            raise SystemExit(f'nothing to acknowledge (state {cur_state})')
+        hc('label', addr, 'ask.state=acked', f'ask.acked={now().isoformat()}')
+        print(json.dumps({'id': cur_id, 'state': 'acked'})); return
+    if args.cmd == 'approval':
+        if labels.get('ask.session') != session_of(d):
+            raise SystemExit('this question belongs to an earlier session of this terminal; not changed')
+        if cur_state not in ACTIVE:
+            raise SystemExit(f'question is {cur_state}; not changed')
+        exp = labels.get('ask.expires')
+        try:
+            if exp and datetime.fromisoformat(exp) < now():
+                raise SystemExit('question expired; not changed')
+        except ValueError:
+            pass
+        link = ['ask.approval_role=', 'ask.approval_session='] if args.clear else approval_labels(args.approval_role, d)
+        hc('label', addr, *link)                 # text, choices, state, created, expiry stay as they are
+        print(json.dumps({'id': cur_id, 'approval_role': None if args.clear else link[0].split('=', 1)[1]}, ensure_ascii=False)); return
+    if args.cmd == 'withdraw':
+        hc('label', addr, 'ask.state=withdrawn')
+        print(json.dumps({'id': cur_id, 'state': 'withdrawn'}))
+
+if __name__ == '__main__':
+    main()

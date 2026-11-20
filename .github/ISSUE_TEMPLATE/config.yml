@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/rimumomuri/herdrdesk/security/advisories/new
+    about: Please report security problems privately, not as a public issue.
+  - name: Herdr or Herdr Core problem
+    url: https://github.com/herdrdev/herdr-app/issues
+    about: Problems in Herdr itself belong in the Herdr repositories.

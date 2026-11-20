@@ -1,0 +1,9 @@
+.build/
+build/
+Resources/web/bundle.js
+.DS_Store
+__pycache__/
+*.xcuserstate
+.env
+local/
+backups/
