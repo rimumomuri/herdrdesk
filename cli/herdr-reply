@@ -68,7 +68,7 @@ def main():
         with bundled_info.open("rb") as settings:
             legacy = plistlib.load(settings).get("HerdrDeskLegacyProfile", False)
     default_root = Path.home() / (".local/state/herdr-desk/results" if legacy
-                                  else "Library/Application Support/HerdrDesk Preview/results")
+                                  else "Library/Application Support/app.herdrdesk/results")
     root = Path(os.environ.get("HERDRDESK_RESULTS") or default_root)
     if not root.is_absolute():
         parser.error("HERDRDESK_RESULTS must be an absolute directory")

@@ -25,7 +25,7 @@ Change the language using the selector in the app. The selected language is stor
 
 Assign a unique `recovery.role` label to each participating coding agent. From inside the requesting Herdr terminal, run `cli/herdr-ask open --text "Which build should I use?"`. A question can carry an optional `--approval-role ROLE` that links to a separate terminal. HerdrDesk can open that terminal after validating the link and session. Actual approval is handled by Herdr. The requesting agent can mark an answered question as received with `cli/herdr-ask ack QUESTION_ID`.
 
-To publish a reply explicitly from a role-labelled agent on the desktop Mac, run `cli/herdr-reply --text "Preview tested"` from its Herdr terminal. It writes a local reply record that the app can display. Records created on remote Macs are local to the remote Mac unless the deployment provides a shared reply directory; this preview does not collect remote assistant transcripts.
+To publish a reply explicitly from a role-labelled agent on the desktop Mac, run `cli/herdr-reply --text "Preview tested"` from its Herdr terminal. It writes a local reply record that the app can display. Records created on remote Macs are local to the remote Mac unless the deployment provides a shared reply directory; HerdrDesk does not collect remote assistant transcripts.
 
 ### Team conversations
 

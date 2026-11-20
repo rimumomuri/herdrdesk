@@ -1,12 +1,12 @@
 import Foundation
 
-/// App data: ~/Library/Application Support/HerdrDesk Preview, or HERDRDESK_DATA (tests and fixture demos,
+/// App data: ~/Library/Application Support/app.herdrdesk, or HERDRDESK_DATA (tests and fixture demos,
 /// so a demo never shares a ledger or lock with the real app).
 public enum DeskPaths {
     public static var data: URL {
         if let d = ProcessInfo.processInfo.environment["HERDRDESK_DATA"], !d.isEmpty { return URL(fileURLWithPath: d, isDirectory: true) }
         return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(
-            retainsLegacyProfile ? "Library/Application Support/HerdrDesk" : "Library/Application Support/HerdrDesk Preview",
+            retainsLegacyProfile ? "Library/Application Support/HerdrDesk" : "Library/Application Support/app.herdrdesk",
             isDirectory: true)
     }
 
@@ -16,7 +16,7 @@ public enum DeskPaths {
 }
 
 /// Exclusive local lock shared by every sender on this Mac (HerdrDesk copies, later the Herdr mod):
-/// `~/Library/Application Support/HerdrDesk Preview/send.lock`. flock is released when the process exits.
+/// `~/Library/Application Support/app.herdrdesk/send.lock`. flock is released when the process exits.
 public final class FileLock {
     private var fd: Int32
     private let mutex = NSLock()
