@@ -49,21 +49,3 @@ public func checkApproval(questionId: String, asker: Term, target: Result<Term, 
         return .success(t)
     }
 }
-
-/// Result of moving the view to an approval target. "opened" only after BOTH herdr-app steps answered
-/// with exit 0 and no timeout. Failure reasons are fixed texts: raw stdout/stderr is never shown.
-public enum ApprovalFocusOutcome: Equatable {
-    case opened
-    case failed(String)
-}
-
-/// The exact two view commands (no keys, no approval, no other command). Runner = herdr-app by absolute path.
-public func runApprovalFocus(app: HcRunning, address: String, timeout: TimeInterval = 10) -> ApprovalFocusOutcome {
-    let focus = app.run(["do", "agent.focus", "--terminal", address], timeout: timeout)
-    if focus.timedOut { return .failed("터미널 이동 명령이 응답하지 않았어요(시간 초과). 이동됐는지 Herdr에서 확인해 주세요.") }
-    if focus.code != 0 { return .failed("터미널 이동 명령이 실패했어요(코드 \(focus.code)). 이동하지 않았어요.") }
-    let layout = app.run(["do", "layout.switch", "--name", "team-focus"], timeout: timeout)
-    if layout.timedOut { return .failed("터미널은 선택했지만 화면 전환이 응답하지 않았어요(시간 초과). Herdr에서 확인해 주세요.") }
-    if layout.code != 0 { return .failed("터미널은 선택했지만 화면 전환이 실패했어요(코드 \(layout.code)). Herdr에서 확인해 주세요.") }
-    return .opened
-}
