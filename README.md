@@ -24,6 +24,8 @@ HerdrDesk checks common install locations and your process PATH for `hc`. If it 
 
 Core discovery works without a team configuration. If your Herdr terminal already has `team.id`, `team.title` or `display.title` labels, HerdrDesk uses those labels for grouping and display. For unlabelled terminals, it uses Herdr's space placement when available. The optional question helper records a question and links an approval destination to its active session. See [configuration](docs/configuration.md) and [release verification](docs/releasing.md).
 
+The card board shown in the screenshot is optional. It appears when you provide an external `herdr-task` command, described in [configuration](docs/configuration.md#optional-card-board-and-computer-list).
+
 ## Privacy
 
 Core is accessed locally and through the remote connections already configured in Herdr. HerdrDesk does not run a cloud service. Terminal output is streamed for the selected session, discarded when observation ends and excluded from saved chat history. Outgoing drafts and local send records are stored on the Mac.
