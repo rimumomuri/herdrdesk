@@ -106,3 +106,33 @@ test('no clone is sent while the chosen team is still being looked up', () => {
   assert.equal(cloneRequest({...form, url:''}), null);
   assert.equal(cloneRequest({...form, team:''}), null);
 });
+
+import {mainMachineLabel} from '../Resources/web/computers.js';
+
+test('the computer HerdrDesk runs on is the main one and is listed first', () => {
+  const listed = [profiles[1], profiles[0], profiles[2]];
+  const rows = computerRows(listed, [{name:'macbook-m6', state:'connected'}], []);
+  assert.deepEqual(rows.map(r => [r.name, r.main]), [['local', true], ['macbook-m6', false], ['macbook-pro', false]]);
+  assert.equal(computerRows([], [{name:'macbook-m6', state:'connected'}], [])[0].main, true);
+});
+
+test('the strip marks the main computer and calls the others workers', () => {
+  const html = computerStripHTML(computerRows(profiles, [{name:'macbook-m6', state:'connected'}], []), copy, escape);
+  const [main, worker] = html.split('class="computer-row').slice(1);
+  assert.match(main, /class="computer-role" data-main="true"[^>]*>computerMain</);
+  assert.match(main, /title="computerMainHint · computer_ready"/);
+  assert.match(worker, /class="computer-role"[^>]*>computerWorker</);
+  assert.doesNotMatch(worker, /computerMain/);
+});
+
+test('the main computer sheet says the leads and records live there', () => {
+  const [main, worker] = computerRows(profiles, [{name:'macbook-m6', state:'connected'}], []);
+  assert.match(computerSheetHTML(main, [], copy, escape), /class="computer-main-note">computerMainNote</);
+  assert.doesNotMatch(computerSheetHTML(worker, [], copy, escape), /computerMainNote/);
+});
+
+test('local terminals are labelled with the main computer name, not "local"', () => {
+  assert.equal(mainMachineLabel(profiles, copy), 'Mac Studio (computerMain)');
+  assert.equal(mainMachineLabel([{name:'local'}], copy), null);
+  assert.equal(mainMachineLabel([], copy), null);
+});

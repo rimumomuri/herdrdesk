@@ -79,6 +79,8 @@ To provide a board, put an executable named `herdr-task` in `~/.local/bin`, `/op
 
 ### Computer settings sheet
 
+The computer HerdrDesk runs on (`local`) is the **main** computer: the leads and every record live there. It is listed first with a **main** badge, and its sheet says so. The other computers are labelled **worker**. Terminals on the main computer show its `label` (for example "Mac Studio (main)") instead of "local".
+
 When `machines` is present, each computer in the **Computers** list opens a settings sheet. It shows the connection, the readiness, the work weight, how many workers may run, roles turned off and the registered projects. Changes are sent to your `herdr-task`:
 
 | Action in the sheet | Command HerdrDesk runs |
