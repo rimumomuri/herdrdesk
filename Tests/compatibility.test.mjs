@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { combineChat, legacyDraftKey, archiveRoles, appendLegacySend } from '../Resources/web/compatibility.js';
+import { combineChat, legacyDraftKey, archiveRoles, appendLegacySend, draftFor, storeDraftFor, LEGACY_SEND_LIMIT, storeJSON } from '../Resources/web/compatibility.js';
 
 const old = { reviewer:[{id:'mold',session:'1:2',text:'Archived text',images:1,at:'2026-11-18T00:00:00Z'},
                        {id:'mnew',session:'6:7',text:'Newest',at:'2026-11-18T01:00:00Z'}] };
@@ -46,4 +46,49 @@ test('a retired role key reads as team and role in plain words', async () => {
   assert.equal(retiredRoleName('shop-concepts', teams), '숍 · 시안');
   assert.equal(retiredRoleName('unknown-thing', teams), 'unknown-thing');
   assert.equal(retiredRoleName('', teams), '');
+});
+
+const twin = (address, session) => ({ address, session, labels: { 'recovery.role': 'shop-builder' } });
+
+test('two terminals with the same role keep separate drafts', () => {
+  const a = twin('t1', '1:1'), b = twin('t2', '2:2');
+  const { drafts, legacy } = storeDraftFor(a, [a, b], {}, {}, 'only for A');
+  assert.equal(draftFor(a, [a, b], drafts, legacy), 'only for A');
+  assert.equal(draftFor(b, [a, b], drafts, legacy), '');
+});
+
+test('an old role draft is restored only while one terminal has that role', () => {
+  const a = twin('t1', '1:1'), b = twin('t2', '2:2');
+  const legacy = { 'shop-builder': 'old draft' };
+  assert.equal(draftFor(a, [a], {}, legacy), 'old draft');
+  assert.equal(draftFor(a, [a, b], {}, legacy), '');
+  assert.equal(draftFor(b, [a, b], {}, legacy), '');
+});
+
+test('editing a uniquely restored role draft moves it to the session and clears the role copy', () => {
+  const a = twin('t1', '1:1');
+  const { drafts, legacy } = storeDraftFor(a, [a], {}, { 'shop-builder': 'old draft' }, 'old draft, edited');
+  assert.equal(drafts['t1:1:1'], 'old draft, edited');
+  assert.equal(Object.hasOwn(legacy, 'shop-builder'), false);
+});
+
+test('send history keeps only the newest records per role', () => {
+  let legacy = {};
+  for (let i = 0; i < LEGACY_SEND_LIMIT + 5; i++) legacy = appendLegacySend(legacy, { id: 'm' + i, session: '1:1', text: 'x', at: i }, 'shop-builder');
+  assert.equal(legacy['shop-builder'].length, LEGACY_SEND_LIMIT);
+  assert.equal(legacy['shop-builder'][0].id, 'm5');
+  assert.equal(legacy['shop-builder'].at(-1).id, 'm' + (LEGACY_SEND_LIMIT + 4));
+});
+
+test('a failed local save is reported instead of silently ignored', () => {
+  const full = { setItem() { throw new Error('QuotaExceededError'); } };
+  const ok = { data: {}, setItem(key, value) { this.data[key] = value; } };
+  assert.equal(storeJSON(full, 'k', { a: 1 }), false);
+  assert.equal(storeJSON(ok, 'k', { a: 1 }), true);
+  assert.equal(ok.data.k, '{"a":1}');
+});
+
+test('with no terminal selected the draft is empty instead of an error', () => {
+  assert.equal(draftFor(undefined, [], {}, {}), '');
+  assert.equal(draftFor(null, [], { 'x:1': 'a' }, { r: 'b' }), '');
 });

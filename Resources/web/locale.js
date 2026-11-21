@@ -213,6 +213,7 @@ const strings = {
  notSent:['The message was not sent.','메시지를 보내지 못했습니다.','メッセージは送信されませんでした。'],
  refused:['Recheck the destination session in Herdr.','Herdr에서 대상 세션을 다시 확인하세요.','Herdr で対象セッションを確認してください。'],
  invalidCore:['Select an executable named hc.','실행 가능한 hc 파일을 선택하세요.','実行可能な hc ファイルを選択してください。'],
+ saveFailed:['Could not save on this Mac. Local storage may be full, so this draft may be lost when the app restarts.','이 Mac에 저장하지 못했습니다. 저장 공간이 가득 찼을 수 있어 앱을 다시 열면 이 초안이 사라질 수 있습니다.','このMacに保存できませんでした。保存領域がいっぱいの可能性があり、アプリを再起動するとこの下書きが失われることがあります。'],
  openFailed:['Could not open the terminal in Herdr.','Herdr에서 터미널을 열지 못했습니다.','Herdr でターミナルを開けませんでした。'],
  streamClosed:['Terminal stream ended.','터미널 연결이 끝났습니다.','ターミナル接続が終了しました。'],
  streamConnecting:['Connecting to the terminal…','터미널 연결 중…','ターミナルに接続中…'],

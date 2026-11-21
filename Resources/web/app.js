@@ -12,7 +12,7 @@ import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick } from './sou
 import { computerRows, computerStripHTML } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText } from './task-board.js';
 import { makeInventory, makeTeamDirectory, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
-import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend } from './compatibility.js';
+import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
 import { enterAction } from './keys.js';
 import { createTerminalView } from './terminal-view.js';
 
@@ -52,7 +52,7 @@ function messageImages(entry){
   return imagePreviews.markup(record);
 }
 const load = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
-const save = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+const save = (key, value) => storeJSON(localStorage, key, value);
 const localeKey = 'ui.language.v1';
 const draftsKey = 'portable.drafts.v1';
 const deliveriesKey = 'portable.deliveries.v1';
@@ -99,24 +99,20 @@ let chatTeamsBySession = new Map();
 let chosen = null, selectedTab = 'chat', eventId = null, noticeKey = '', flight = null;
 const drafts = load(draftsKey, {});
 const legacyDrafts=load('drafts.v1',{});
-let legacyMessages=load('ownMessages.v1',{});
+let legacyMessages=Object.fromEntries(Object.entries(load('ownMessages.v1',{})).map(([role,rows])=>[role,Array.isArray(rows)?rows.slice(-LEGACY_SEND_LIMIT):rows]));
 const attachmentsByTarget=new Map();
 const loadingAttachments=new Set();
 const attachmentPending=new Map();
 const attachmentNotices=new Map();
-const draftValue=term=>{
-  const role=legacyDraftKey(term);
-  return (role&&Object.hasOwn(legacyDrafts,role)?legacyDrafts[role]:drafts[sessionKey(term)])||'';
-};
+// Drafts belong to one terminal session; an old role-keyed draft is shown only while that role is unambiguous.
+const draftValue=term=>draftFor(term,inventory,drafts,legacyDrafts);
 function storeDraft(term,value){
-  const role=legacyDraftKey(term);
-  if(role) {
-    Object.defineProperty(legacyDrafts,role,{value,enumerable:true,configurable:true,writable:true});
-    save('drafts.v1',legacyDrafts);
-  } else {
-    drafts[sessionKey(term)]=value;
-    save(draftsKey,drafts);
-  }
+  const next=storeDraftFor(term,inventory,drafts,legacyDrafts,value);
+  const legacyChanged=Object.keys(next.legacy).length!==Object.keys(legacyDrafts).length;
+  Object.keys(drafts).forEach(key=>delete drafts[key]); Object.assign(drafts,next.drafts);
+  let saved=true;
+  if(legacyChanged){ Object.keys(legacyDrafts).forEach(key=>delete legacyDrafts[key]); Object.assign(legacyDrafts,next.legacy); saved=save('drafts.v1',legacyDrafts); }
+  if(!save(draftsKey,drafts)||!saved)showNotice('saveFailed');
 }
 const deliveries = load(deliveriesKey, []).map(item => item.state === 'sending' ? { ...item, state: 'needsCheck' } : item);
 const copy = key => t(key, language);
@@ -2213,7 +2209,7 @@ window.desk={
     item.state=state;
     if(state==='sent')item.previews=previews;
     legacyMessages=appendLegacySend(legacyMessages,item,item.role||'session:'+item.target);
-    save('ownMessages.v1',Object.fromEntries(Object.entries(legacyMessages).map(([role,rows])=>[role,chatImageHistory(rows)])));
+    if(!save('ownMessages.v1',Object.fromEntries(Object.entries(legacyMessages).map(([role,rows])=>[role,chatImageHistory(rows)]))))showNotice('saveFailed');
     if(state==='sent'){
       playSound('sent');
       markAssignment(item.target);

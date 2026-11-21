@@ -667,14 +667,7 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
         return ChatImageRecord(id:id,role:role,session:session,body:body)
     }
 
-    private func attachmentKey(_ term: Term) -> String? {
-        if let role = term.role {
-            guard role != ".", role != "..", role.range(of: "^[A-Za-z0-9._-]{1,64}$", options: .regularExpression) != nil else { return nil }
-            return role
-        }
-        let digest = SHA256.hash(data: Data((term.address + ":" + term.session).utf8))
-        return "session-" + digest.prefix(20).map { String(format: "%02x", $0) }.joined()
-    }
+    private func attachmentKey(_ term: Term) -> String? { AttachmentKey.make(for: term, among: candidates) }
 
     private func loadArchivedAttachmentRoles() {
         attachmentQueue.async {

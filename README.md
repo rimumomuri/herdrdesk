@@ -1,6 +1,6 @@
 # HerdrDesk
 
-HerdrDesk is an independent macOS companion for [Herdr](https://github.com/herdrdev/herdr-app). It groups live terminals by team, space and device, displays a selected terminal in read-only mode, and lets you send work to a supported coding agent. The main interface is available in English, Korean and Japanese.
+HerdrDesk is an independent macOS companion for [Herdr](https://github.com/herdrdev/herdr-app). It groups live terminals by team, space and device, shows a selected terminal live, and lets you send work to a supported coding agent. The main interface is available in English, Korean and Japanese.
 
 ![HerdrDesk in English with synthetic terminals](docs/images/dashboard.png)
 
@@ -20,9 +20,12 @@ HerdrDesk checks common install locations and your process PATH for `hc`. If it 
 1. Open your terminals or coding agents in Herdr.
 2. Open HerdrDesk and select a terminal from the structure panel.
 3. Open **Team Chats** to send to a team’s registered lead, or choose a member for a direct conversation. **Sent** means Core reported that it started delivery. A message can still await a receipt.
-4. Use **Terminal** for live, read-only output. **Open in Herdr** switches to Herdr for typing and approval.
+4. Use **Terminal** for live output. Click inside the terminal to type into it, for example to answer an approval prompt. Keys reach the terminal only while you have clicked into it and HerdrDesk is the active app. **Open in Herdr** switches to Herdr.
+   To keep the terminal view read-only, launch HerdrDesk with `HERDRDESK_NO_SEND=1`. This also turns off sending work from HerdrDesk.
 
 Core discovery works without a team configuration. If your Herdr terminal already has `team.id`, `team.title` or `display.title` labels, HerdrDesk uses those labels for grouping and display. For unlabelled terminals, it uses Herdr's space placement when available. The optional question helper records a question and links an approval destination to its active session. See [configuration](docs/configuration.md) and [release verification](docs/releasing.md).
+
+The card board shown in the screenshot is optional. It appears when you provide an external `herdr-task` command, described in [configuration](docs/configuration.md#optional-card-board-and-computer-list).
 
 ## Privacy
 
