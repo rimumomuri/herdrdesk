@@ -701,7 +701,12 @@ main[data-page=conversations] .terminal-drawer-head {
 }
 .terminal-drawer-head div { min-width:0 }
 .terminal-drawer-head span { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--muted); font-size:11px }
-#inlineApproval { flex:none; max-height:28%; overflow:auto }
+#inlineApproval { flex:none; max-height:45%; overflow:auto }
+.chat-questions { display:grid; gap:6px; margin:4px 0 }
+.chat-question { padding:8px 10px; border:1px solid #484033; border-radius:8px; background:var(--panel, transparent) }
+.chat-question strong { color:var(--warn); font-size:12px }
+.chat-question p { white-space:pre-wrap; margin:0 }
+.chat-question textarea { width:100%; box-sizing:border-box; resize:vertical }
 @media(max-width:900px) {
   main[data-page=conversations] .terminal-drawer-open { position:relative; grid-template-columns:minmax(0,1fr) }
   main[data-page=conversations] .terminal-drawer-open>#terminal { grid-column:auto; grid-row:auto; position:absolute; inset:5px; z-index:4 }

@@ -33,7 +33,7 @@ The Team Chats view sends to the team's unique live lead and keeps direct messag
 
 To share a message explicitly with a team, run the bundled `herdr-team-message --team TEAM_ID --text "Preview tested"` from your own role-labelled Herdr terminal. The repository helper also accepts `cli/herdr-reply --team TEAM_ID --text "Preview tested"`. The record goes to the local HerdrDesk results directory, or to the configured `HERDRDESK_RESULTS` directory. The team ID must match a team the publishing role belongs to. A share creates a timeline entry and does not deliver a message to another agent. Use the usual Herdr delivery workflow for assignments.
 
-Team chats show sends initiated in that team view, explicit team shares, and recorded same-team handoffs. Private replies and terminal output remain in their respective views. Question and approval alerts appear inside the app and link to the question or its verified Herdr terminal.
+Team chats show sends initiated in that team view, explicit team shares, and recorded same-team handoffs. Private replies and terminal output remain in their respective views. A question appears only inside the conversation of the agent that asked it, where you answer it directly (choices, a text field and a send button). There is no banner, count or separate answer tab at the top; the conversation list still shows how many questions wait in each conversation. An approval question offers its verified Herdr terminal from the same card.
 
 ## Optional: card board and computer list
 
