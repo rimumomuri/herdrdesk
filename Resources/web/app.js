@@ -9,7 +9,7 @@ import { shortRoleTitle, nextKey, chatHidden, foldLeadChats, inRoomConversation,
 import { buildChain, handoffCardsFor, handoffCardHTML, isDelegating } from './handoff-chain.js';
 import { messageTag, awaitingResponse, tagHTML } from './message-tags.js';
 import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick } from './sound-rules.js';
-import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest } from './computers.js';
+import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest, mainMachineLabel } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText } from './task-board.js';
 import { questionFormHTML, keepTyping } from './chat-questions.js';
 import { makeInventory, makeTeamDirectory, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
@@ -193,7 +193,7 @@ function time(at) {
 const questions = () => registeredQuestions(snapshot.terms,snapshot.ledger||{});
 const needsAttention = term => ['blocked','error'].includes(term.status) || questions().some(q=>
   ['answerNeeded','needsCheck'].includes(q.state) && (q.approval?.address || q.address)===term.address);
-const localMachine = () => snapshot.isolated ? copy('local') : snapshot.localMachine || copy('local');
+const localMachine = () => snapshot.isolated ? copy('local') : snapshot.localMachine || mainMachineLabel(snapshot.tasks?.machines||[],copy) || copy('local');
 const machineFor = term => term.machine || localMachine();
 const agentName = term => ({'codex':'Codex','claude-code':'Claude Code'}[term?.agent] || '');
 const agentLabel = term => [agentName(term),term?.modelOptions?.reportedModel].filter(Boolean).join(' · ');

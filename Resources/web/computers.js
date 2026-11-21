@@ -1,21 +1,29 @@
 // Computers that can run card workers: connection (live from hc), readiness and weight class (machines.json
 // via the task board), and how many card workers each runs now. Pure: no DOM.
 
-/** state: ready | not-ready | offline. The local Mac is always reachable. editable: the list came from machines.json. */
+/** state: ready | not-ready | offline. The local Mac is always reachable. editable: the list came from machines.json.
+ *  main: the Mac HerdrDesk runs on, where the leads and records live; always listed first. */
 export function computerRows(profiles = [], liveMachines = [], terms = []) {
   const live = new Map(liveMachines.map(machine => [machine.name, machine.state]));
   const editable = profiles.length > 0;
   const listed = editable ? profiles
     : [{ name: 'local', ready: true, tier: 'heavy', slots: 0 }, ...liveMachines.map(machine => ({ name: machine.name, ready: true, tier: 'heavy', slots: 0 }))];
-  return listed.map(profile => {
+  const rows = listed.map(profile => {
     const connected = profile.name === 'local' || live.get(profile.name) === 'connected';
     const used = terms.filter(term => term.state === 'live' && term.labels?.['task.spawned'] === '1'
       && (term.machine || 'local') === profile.name).length;
     return { name: profile.name, label: profile.label || profile.name, tier: profile.tier || 'heavy', slots: profile.slots || 0,
-             used, ready: !!profile.ready, connected, editable,
+             used, ready: !!profile.ready, connected, editable, main: profile.name === 'local',
              projects: profile.projects === '*' ? '*' : (profile.projects || {}), rolesOff: profile.rolesOff || {}, repos: profile.repos || {},
              state: !connected ? 'offline' : profile.ready ? 'ready' : 'not-ready' };
   });
+  return [...rows.filter(row => row.main), ...rows.filter(row => !row.main)];
+}
+
+/** Device name for terminals on this Mac: the main computer's label from machines.json, or null when it has none. */
+export function mainMachineLabel(profiles = [], copy) {
+  const label = profiles.find(profile => profile.name === 'local')?.label;
+  return label ? label + ' (' + copy('computerMain') + ')' : null;
 }
 
 export function computerStripHTML(rows, copy, escape) {
@@ -23,8 +31,10 @@ export function computerStripHTML(rows, copy, escape) {
   return '<h3 class="computer-title">' + escape(copy('computers')) + '</h3>' + rows.map(row => {
     const tag = row.editable ? 'button' : 'div';
     const extra = row.editable ? ' type="button" data-computer="' + escape(row.name) + '" aria-haspopup="dialog"' : '';
-    return '<' + tag + ' class="computer-row"' + extra + ' data-state="' + escape(row.state) + '" title="' + escape(copy('computer_' + row.state)) + '">'
+    const title = (row.main ? copy('computerMainHint') + ' · ' : '') + copy('computer_' + row.state);
+    return '<' + tag + ' class="computer-row"' + extra + ' data-state="' + escape(row.state) + '" title="' + escape(title) + '">'
       + '<i class="computer-dot" aria-hidden="true"></i><b>' + escape(row.label) + '</b>'
+      + '<span class="computer-role"' + (row.main ? ' data-main="true"' : '') + '>' + escape(copy(row.main ? 'computerMain' : 'computerWorker')) + '</span>'
       + '<small>' + escape(copy(row.tier === 'light' ? 'tierLight' : 'tierHeavy')) + '</small>'
       + '<span class="computer-load">' + (row.slots ? row.used + '/' + row.slots : row.used) + '</span></' + tag + '>';
   }).join('');
@@ -44,6 +54,7 @@ export function cloneTeams(configured = [], terms = [], projects = {}, repos = {
 export function computerSheetHTML(row, teams, copy, escape) {
   const option = (value, label, selected) => '<option value="' + escape(value) + '"' + (selected ? ' selected' : '') + '>' + escape(label) + '</option>';
   let html = '<h2 id="computerTitle">' + escape(row.label) + '</h2>'
+    + (row.main ? '<p class="computer-main-note">' + escape(copy('computerMainNote')) + '</p>' : '')
     + '<p class="computer-state" data-state="' + escape(row.state) + '"><i class="computer-dot" aria-hidden="true"></i>' + escape(copy('computer_' + row.state)) + '</p>'
     + '<div class="computer-settings">'
     + '<label class="computer-check"><input id="computerReady" type="checkbox"' + (row.ready ? ' checked' : '') + '>' + escape(copy('computerReady')) + '</label>'
