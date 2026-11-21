@@ -41,6 +41,8 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                                    ?? HcResult(code: 127, out: "", err: "herdr-task not found", timedOut: false) })
     }()
     private var taskBoard: [String: Any] = [:]
+    private lazy var taskExecutable: String? = ProcessHc.resolveExecutable("herdr-task", overrides: [ProcessInfo.processInfo.environment["HERDRDESK_TASK"]])
+    private let machineQueue = DispatchQueue(label: "herdrdesk.machines", qos: .userInitiated)
     private let taskQueue = DispatchQueue(label: "herdrdesk.tasks", qos: .utility)
     private var taskPolling = false
     private var taskVersion = 0
@@ -539,6 +541,25 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                 })
             } else {
                 modifyAttachments(key: key, address: address, session: session)
+            }
+        case "machine":
+            guard let token = field("token", 64) else { return }
+            func reply(_ payload: [String: Any]) { call("window.desk.machineResult(payload)", ["payload": payload.merging(["token": token]) { a, _ in a }]) }
+            guard environment["HERDRDESK_NO_SEND"] != "1", window.isKeyWindow, NSApp.isActive,
+                  let argv = MachineSettings.argv(body, terms: candidates) else { reply(["ok": false, "error": "refused"]); return }
+            guard let exe = taskExecutable else { reply(["ok": false, "error": "herdr-task not found"]); return }
+            machineQueue.async {
+                let result = ProcessHc(path: exe).run(argv, timeout: MachineSettings.timeout(argv))
+                let parsed = result.out.split(separator: "\n").last.flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) }
+                DispatchQueue.main.async {
+                    if result.code == 0, !result.timedOut {
+                        reply(["ok": true, "result": parsed ?? [:]])
+                        if argv[1] != "suggest" { self.requestTaskPoll() }
+                    } else {
+                        let reason = result.timedOut ? "timed out" : result.err.replacingOccurrences(of: "refused: ", with: "")
+                        reply(["ok": false, "error": String(reason.trimmingCharacters(in: .whitespacesAndNewlines).prefix(400))])
+                    }
+                }
             }
         case "terminalUnwatch":
             if field("id") == watch?.id { stopWatch() }

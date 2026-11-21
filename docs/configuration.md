@@ -62,8 +62,10 @@ To provide a board, put an executable named `herdr-task` in `~/.local/bin`, `/op
     }
   },
   "machines": [
-    { "name": "local", "label": "Studio", "tier": "heavy", "slots": 6, "ready": true },
-    { "name": "macbook", "label": "MacBook", "tier": "light", "slots": 2, "ready": true }
+    { "name": "local", "label": "Studio", "tier": "heavy", "slots": 6, "ready": true,
+      "projects": "*", "repos": { "shop": "/Users/me/work/shop" } },
+    { "name": "macbook", "label": "MacBook", "tier": "light", "slots": 2, "ready": true,
+      "projects": { "shop": "/Users/me/work/shop" }, "rolesOff": { "planner": "Claude not logged in" } }
   ]
 }
 ```
@@ -72,5 +74,20 @@ To provide a board, put an executable named `herdr-task` in `~/.local/bin`, `/op
 - `state` is one of `queued`, `working`, `review`, `blocked`, `done` or `cancelled`. Done cards stay on the board for 24 hours after `updated`.
 - `done` lists completion criteria and `doneChecks` marks which are met. `owner.address` is the Herdr Core terminal working on the card, and `owner.session` lets HerdrDesk ignore a terminal that has since been reused.
 - `machines` is optional. `name` matches a Herdr Core machine name (`local` is this Mac). `tier` is `heavy` or `light`. `slots` is how many card workers that machine may run. A machine whose `ready` is `false` is shown as not ready. A worker counts toward a machine's load when its terminal has the label `task.spawned=1`.
+
+- `projects`, `repos` and `rolesOff` are optional and only feed the computer settings sheet (below). `projects` is `"*"` for a machine that works in every project's own folder, or a map from team to the clone on that machine. `repos` (usually on `local`) maps a team to this Mac's clone, used to prefill a new clone. `rolesOff` lists roles a machine does not take, with the reason.
+
+### Computer settings sheet
+
+When `machines` is present, each computer in the **Computers** list opens a settings sheet. It shows the connection, the readiness, the work weight, how many workers may run, roles turned off and the registered projects. Changes are sent to your `herdr-task`:
+
+| Action in the sheet | Command HerdrDesk runs |
+|---|---|
+| Take card work on/off, work weight, workers at once | `herdr-task machine set <name> [--ready on\|off] [--tier heavy\|light] [--slots N]` |
+| Choose a team to receive | `herdr-task machine suggest --team <team>` → `{"url": "...", "path": "~/..."}` |
+| Receive | `herdr-task machine clone <name> --team <team> --url <url> --path <path>` (up to 16 minutes) |
+| Remove | `herdr-task machine unlink <name> --team <team>` (the files stay) |
+
+Exit code 0 with a JSON line means success. Any other exit code is shown as not done, with the standard error text. HerdrDesk checks each field before running the command (names, `on`/`off`, `heavy`/`light`, 0–64 workers, a URL and a folder starting with `~/` or `/`, no control characters), and the sheet is read-only when `HERDRDESK_NO_SEND=1`. Your `herdr-task` decides what a change means: the reference implementation clones over the Herdr Core connection, refuses a folder that already holds something else, registers an existing clone of the same repository without touching it, keeps the previous list as `machines.json.bak`, and does not install dependencies.
 
 HerdrDesk re-reads the board only when something changes in the folder `<root>/state` or in the file `<root>/machines.json`. The default root is `~/workspace/operations/herdr-tasks`. Set `HERDRDESK_TASK_ROOT` to use another folder when you launch HerdrDesk from a terminal. Your `herdr-task` should write its records there, or touch a file there after each change.

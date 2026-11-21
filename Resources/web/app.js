@@ -9,7 +9,7 @@ import { shortRoleTitle, nextKey, chatHidden, foldLeadChats, inRoomConversation,
 import { buildChain, handoffCardsFor, handoffCardHTML, isDelegating } from './handoff-chain.js';
 import { messageTag, awaitingResponse, tagHTML } from './message-tags.js';
 import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick } from './sound-rules.js';
-import { computerRows, computerStripHTML } from './computers.js';
+import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText } from './task-board.js';
 import { makeInventory, makeTeamDirectory, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
 import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
@@ -511,6 +511,7 @@ function renderRooms(){
   rows.splice(0,rows.length,...folded.rows);
   sidebarRows=new Map(rows.map(row=>[row.key,row]));
   setPanel('#computerStrip',computerStripHTML(computerRows(snapshot.tasks?.machines||[],snapshot.machines||[],inventory),copy,escape));
+  renderComputerSheet();
   const shown=rows.filter(row=>!chatHidden(row,chatPreferences.get(row.key)));
   const pinned=[...pinnedChats].reverse().map(key=>sidebarRows.get(key)).filter(row=>row&&!chatHidden(row,chatPreferences.get(row.key)));
   const recent=shown.filter(row=>!pinnedChats.has(row.key));
@@ -2134,7 +2135,98 @@ document.addEventListener('visibilitychange',()=>{
 motionPreference.addEventListener('change',()=>{renderRooms();detail();});
 window.addEventListener('pagehide',()=>terminalView.stop());
 
+// Computer settings sheet: edits machines.json through `herdr-task machine ...` (Swift checks every field).
+let computerOpen=null,machineToken=0;
+const machinePending=new Map();
+function machineRequest(request,done){
+  const token='m'+(++machineToken);
+  machinePending.set(token,done);
+  post({type:'machine',token,...request});
+}
+const computerRowFor=name=>computerRows(snapshot.tasks?.machines||[],snapshot.machines||[],inventory).find(row=>row.name===name&&row.editable);
+const computerMessage=text=>{$('#computerMessage').textContent=text||'';};
+const machineFailure=result=>copy('computerFailed')+(result.error||'');
+function renderComputerSheet(force=false){
+  if(!computerOpen)return;
+  const form=$('#computerCloneForm');
+  if(!force&&(document.activeElement?.closest?.('#computerSheet')||form?.dataset.busy))return;
+  const row=computerRowFor(computerOpen);
+  if(!row){$('#computerDialog').close();return;}
+  const kept=form?{team:$('#computerCloneTeam').value,url:$('#computerCloneUrl').value,path:$('#computerClonePath').value}:null;
+  $('#computerSheet').innerHTML=computerSheetHTML(row,cloneTeams(snapshot.configuredTeams||[],inventory,row.projects,computerRowFor('local')?.repos),copy,escape);
+  if(kept&&$('#computerCloneForm')&&[...$('#computerCloneTeam').options].some(option=>option.value===kept.team)){
+    $('#computerCloneTeam').value=kept.team;$('#computerCloneUrl').value=kept.url;$('#computerClonePath').value=kept.path;
+  }
+}
+$('#computerStrip').addEventListener('click',event=>{
+  const button=event.target.closest('[data-computer]');
+  if(!button)return;
+  computerOpen=button.dataset.computer;
+  computerMessage('');
+  renderComputerSheet(true);
+  $('#computerDialog').showModal();
+});
+$('#computerClose').addEventListener('click',()=>$('#computerDialog').close());
+$('#computerDialog').addEventListener('close',()=>{computerOpen=null;});
+function saveComputerSetting(change){
+  machineRequest({action:'set',name:computerOpen,...change},result=>{
+    computerMessage(result.ok?copy('computerSaved'):machineFailure(result));
+    if(!result.ok)renderComputerSheet(true);
+  });
+}
+$('#computerSheet').addEventListener('change',event=>{
+  const field=event.target;
+  if(field.id==='computerReady')saveComputerSetting({ready:field.checked?'on':'off'});
+  else if(field.id==='computerTier')saveComputerSetting({tier:field.value});
+  else if(field.id==='computerSlots'){
+    const slots=Number(field.value);
+    if(Number.isInteger(slots)&&slots>=0&&slots<=64)saveComputerSetting({slots});
+  }else if(field.id==='computerCloneTeam'&&field.value){
+    const team=field.value;
+    machineRequest({action:'suggest',team},result=>{
+      if($('#computerCloneTeam')?.value!==team)return;
+      if(!result.ok){computerMessage(copy('computerSuggestFailed'));return;}
+      $('#computerCloneUrl').value=result.result?.url||'';
+      $('#computerClonePath').value=result.result?.path||'';
+    });
+  }
+});
+$('#computerSheet').addEventListener('submit',event=>{
+  if(event.target.id!=='computerCloneForm')return;
+  event.preventDefault();
+  const form=event.target,name=computerOpen;
+  const request={action:'clone',name,team:$('#computerCloneTeam').value,url:$('#computerCloneUrl').value.trim(),path:$('#computerClonePath').value.trim()};
+  if(!request.team||!request.url||!request.path)return;
+  form.dataset.busy='1';
+  $('#computerCloneSubmit').disabled=true;
+  $('#computerCloneStatus').textContent=copy('computerCloning');
+  computerMessage('');
+  machineRequest(request,result=>{
+    delete form.dataset.busy;
+    if(result.ok){
+      computerMessage(copy('computerSaved')+' · '+(result.result?.path||''));
+      if(computerOpen===name)renderComputerSheet(true);
+    }else if(form.isConnected){
+      $('#computerCloneSubmit').disabled=false;
+      $('#computerCloneStatus').textContent=machineFailure(result);
+    }else computerMessage(machineFailure(result));
+  });
+});
+$('#computerSheet').addEventListener('click',event=>{
+  const button=event.target.closest('[data-unlink]');
+  if(!button)return;
+  button.disabled=true;
+  machineRequest({action:'unlink',name:computerOpen,team:button.dataset.unlink},result=>{
+    computerMessage(result.ok?copy('computerSaved'):machineFailure(result));
+    if(!result.ok)button.disabled=false;
+  });
+});
 window.desk={
+  machineResult(payload){
+    const done=machinePending.get(payload?.token);
+    machinePending.delete(payload?.token);
+    done?.(payload);
+  },
   update(payload){
     if(!('handoffs' in payload)&&snapshot?.handoffs)payload.handoffs=snapshot.handoffs;   // sent only when it changes
     if(!('tasks' in payload)&&snapshot?.tasks)payload.tasks=snapshot.tasks;

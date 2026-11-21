@@ -25,7 +25,7 @@ HerdrDesk checks common install locations and your process PATH for `hc`. If it 
 
 Core discovery works without a team configuration. If your Herdr terminal already has `team.id`, `team.title` or `display.title` labels, HerdrDesk uses those labels for grouping and display. For unlabelled terminals, it uses Herdr's space placement when available. The optional question helper records a question and links an approval destination to its active session. See [configuration](docs/configuration.md) and [release verification](docs/releasing.md).
 
-The card board shown in the screenshot is optional. It appears when you provide an external `herdr-task` command, described in [configuration](docs/configuration.md#optional-card-board-and-computer-list).
+The card board shown in the screenshot is optional. It appears when you provide an external `herdr-task` command, described in [configuration](docs/configuration.md#optional-card-board-and-computer-list). The same command can also back a settings sheet for each computer (turn work on or off, set the worker count, clone a project onto another Mac): see [computer settings sheet](docs/configuration.md#computer-settings-sheet).
 
 ## Privacy
 

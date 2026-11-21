@@ -1238,6 +1238,27 @@ main[data-page=conversations] .feed-row[data-transfer] { max-width:min(100%,880p
 .computer-row[data-state=not-ready] .computer-dot { background:#e0b85a }
 .computer-row[data-state=offline] .computer-dot { background:#ef6b6b }
 .computer-row[data-state=offline] b { color:var(--muted) }
+button.computer-row { width:100%; padding:2px 4px; margin:0 -4px; border:0; border-radius:5px; background:none; font:inherit; text-align:left; cursor:pointer }
+button.computer-row:hover, button.computer-row:focus-visible { background:#ffffff0f }
+.computer-dialog { width:min(460px,calc(100vw - 32px)); max-height:calc(100vh - 48px); overflow:auto; padding:16px 18px; border:1px solid var(--line); border-radius:10px; background:#1c1c21; color:var(--ink) }
+.computer-dialog::backdrop { background:#0707088c }
+.computer-dialog h2 { margin:0 0 4px; font-size:15px }
+.computer-dialog h3 { margin:14px 0 6px; font-size:11px; font-weight:650; color:var(--muted) }
+.computer-state { display:flex; align-items:center; gap:7px; margin:0; font-size:12px; color:var(--muted) }
+.computer-state[data-state=not-ready] .computer-dot { background:#e0b85a }
+.computer-state[data-state=offline] .computer-dot { background:#ef6b6b }
+.computer-settings { display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; margin-top:12px }
+.computer-settings label, .computer-clone label { display:grid; gap:4px; color:var(--muted); font-size:11px }
+.computer-settings .computer-check { grid-column:1 / -1; display:flex; align-items:center; gap:7px; color:var(--ink); font-size:12px }
+.computer-dialog select, .computer-dialog input:not([type=checkbox]) { width:100%; min-width:0; padding:6px 8px; border:1px solid #52525b; border-radius:6px; background:#18181c; color:var(--ink); font:inherit }
+.computer-list { list-style:none; margin:0; padding:0; display:grid; gap:4px }
+.computer-list li { display:flex; align-items:center; gap:8px; font-size:12px; min-width:0 }
+.computer-list small { color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1 }
+.computer-empty, .computer-note { margin:0; color:var(--muted); font-size:11px; line-height:1.5 }
+.computer-clone { display:grid; gap:8px }
+.computer-clone>div, .computer-actions { display:flex; justify-content:flex-end; gap:5px }
+.computer-status { margin:6px 0 0; min-height:1em; font-size:11px; color:var(--muted); overflow-wrap:anywhere }
+.computer-actions { margin-top:10px }
 
 /* Native bounded PNG previews; retain aspect ratio in direct and room messages. */
 .chat-images{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;max-width:100%}
