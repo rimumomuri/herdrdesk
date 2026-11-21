@@ -154,10 +154,14 @@ A plain `ssh-copy-id` would give the new Mac a full login as the hub user. Joini
   | Access | Allowed |
   |---|---|
   | `view` | `ready`, `refresh`, `terminalWatch`/`Unwatch` (read only), `chatImages`, reading attachments and links |
-  | `operate` (default for join) | Everything in `view`, plus `send`, `answer`, `approval`, `attach`/`detach`, `terminalInput` |
+  | `operate` (default for join) | Everything in `view`, plus `send`, `answer`, `approval`, `attach`/`detach`. Sends go only to a live agent terminal with a role (Codex or Claude Code), re-checked on the hub right before `hc send`. A plain shell, a finished terminal, or one whose agent has exited is refused. |
   | `admin` | Everything in `operate`, plus `machine` (computer settings, clone, unlink) and `chooseCore` |
 
   A refused message gets an error result and is logged with the client name. Window focus is never treated as authority.
+- **Raw terminal input is a separate full-trust grant.** `terminalInput` sends raw keystrokes to a terminal. Typing into a shell, or into an agent terminal after the agent exits and returns to its shell, runs commands as the hub user. That equals a shell login, whatever the SSH key allows. So it belongs to no access level:
+  - It is granted only by an extra flag in the forced command, `--terminal-input`, added by `herdrdesk-join --terminal-input`. The script warns that this is equivalent to a hub login.
+  - Without the grant, the controller refuses every `terminalInput` message on the hub. `terminalWatch` for that client is read-only. The `hello` access tells the viewer to hide the input box, but the hub's refusal is what enforces it.
+  - With the grant, input is still refused unless the terminal is live. The window-focus check stays as a local guard.
 - **Card workers, the other direction.** The hub also needs to place card workers on the new Mac (hub → Mac). That uses the hub's key in the new Mac's `authorized_keys`, which is what card placement needs today. That key is a normal login, because workers run real commands there. The setup step states this plainly.
 - **Optional full trust.** Adding the hub to the viewer's own Herdr (so the Herdr app can show hub terminals, and `open` works) needs a normal login on the hub. It is a separate opt-in step in `herdrdesk-join` (`--full-login`), never the default.
 
@@ -219,6 +223,8 @@ Neither Mac makes new assignments during steps 1 to 3. This is the same rule the
 - **Live update across windows.** Viewers A and B are both open. A sends a message. Without a reconnect, B's next `update` contains the delivery and the reply. A's `sendResult` goes only to A.
 - **One send.** A and B answer the same question at the same time. Exactly one `hc send` runs (fake `hc`). The other gets an "already answered" result.
 - **Access.**
+  - A default `operate` client's `terminalInput` is refused on the hub, both for an agent terminal and for a plain shell. Its watch stays read-only. Only a client with `--terminal-input` can type.
+  - An `operate` client's `send` to a plain shell (no agent app) is refused.
   - A `view` client's `send` is refused on the hub.
   - An `operate` client's `machine` is refused.
   - The focus flag in a forged message does not change either result.
