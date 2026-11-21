@@ -16,7 +16,7 @@ Use an original, side-facing sheep with rounded wool, a slate face, one ear and 
 | Live and working | Each recognized agent uses a cream sheep portrait holding its provider logo inside its mouth. This follows the HerdrDesk app icon. The active portrait blinks and chews lightly with the orange bead orbiting in front of and behind it. The provider logo stays visible. Keep the provider name in the activity text. Agents without a recognized provider use the neutral sheep for activity. |
 | Idle or disconnected | The sheep rests beside the state label and keeps the provider logo in its mouth. |
 | Recorded handoff or reply | Show a compact sender-to-recipient row. The sheep passes a paper card once when the row arrives. Open Shared & Handoffs for the full timeline. |
-| New question or approval | The sheep tilts its head once in the alert. A static amber count remains until the request is handled. |
+| New question or approval | The question card appears in its conversation. The conversation list keeps a static amber count until the request is handled. |
 | Unread result or share | A blue dot shows that the corresponding chat or timeline has something new. Working, unread and pending approval are independent states. |
 | Reduced motion | Keep the same static sheep and state text. No movement is required to interpret a state. |
 

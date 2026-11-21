@@ -11,6 +11,7 @@ import { messageTag, awaitingResponse, tagHTML } from './message-tags.js';
 import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick } from './sound-rules.js';
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText } from './task-board.js';
+import { questionFormHTML, keepTyping } from './chat-questions.js';
 import { makeInventory, makeTeamDirectory, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
 import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
 import { enterAction } from './keys.js';
@@ -145,9 +146,7 @@ function replacePreferences(next){
   save(chatPreferencesKey,Object.fromEntries(chatPreferences));
 }
 let terminalOpen=false, approvalTarget=null, pendingApproval=null;
-let roomID=null, memberTeam=null, roomStarted=false, arrivalID=null, arrivalTimer;
-let alertsReady=false;
-const seenQuestions=new Set();
+let roomID=null, memberTeam=null, roomStarted=false, arrivalID=null;
 const historyHandoffs=new Map(load('team.handoffs.v1',[]).map(row=>[row.id,row]));
 const timelineIds=new Set(), routePulses=new Map();
 const openProgress=new Set();
@@ -752,31 +751,11 @@ function recordHandoffs() {
   }
 }
 
-function renderArrival(list) {
-  const pending=list.filter(q=>['answerNeeded','needsCheck'].includes(q.state));
-  const count=$('#alertCount');
-  count.hidden=!pending.length;
-  count.textContent=copy('approvalTab')+' '+pending.length;
-  const arrived=alertsReady&&snapshot.connection==='live'?pending.find(q=>!seenQuestions.has(q.id)):null;
-  if(snapshot.connection==='live'){
-    for(const q of pending)seenQuestions.add(q.id);
-    alertsReady=true;
-  }
-  if(arrived){
-    $('#arrivalSheep').innerHTML=sheep('notice');
-    arrivalID=arrived.id;
-    clearTimeout(arrivalTimer);
-    arrivalTimer=setTimeout(()=>{arrivalID=null;$('#arrival').hidden=true;},8500);
-  }
-  const current=pending.find(q=>q.id===arrivalID);
-  $('#arrival').hidden=!current;
-  if(!current)return;
-  $('#arrivalTitle').textContent=copy(current.approval?'newApproval':'newQuestion');
-  $('#arrivalFrom').textContent=inventory.find(term=>term.address===current.address)?.label||current.address;
-  $('#arrivalOpen').textContent=copy(current.approval?.address?'openApproval':'viewQuestion');
-  $('#arrivalDismiss').setAttribute('aria-label',copy('close'));
+// Questions appear only inside their conversation: no banner and no count at the top.
+function renderArrival() {
+  $('#alertCount').hidden=true;
+  $('#arrival').hidden=true;
 }
-
 function renderDirectory() {
   if(page!=='structure')return;
   const groups=makeTeamDirectory(inventory,assignedTeams());
@@ -818,8 +797,8 @@ function showQuestions() {
   const list=registeredQuestions(snapshot.terms,snapshot.ledger||{});
   renderArrival(list);
   const tab=$('[data-tab=questions]');
-  tab.hidden=!list.length;
-  if(!list.length && selectedTab==='questions')selectedTab='chat';
+  tab.hidden=true;
+  if(selectedTab==='questions')selectedTab='chat';
   const waiting=list.filter(q=>['answerNeeded','needsCheck'].includes(q.state)).length;
   const label=copy('approvalTab')+(waiting?' <span class="tab-count">'+waiting+'</span>':'');
   if(tab.innerHTML!==label)tab.innerHTML=label;
@@ -829,17 +808,15 @@ function showQuestions() {
   if(focused && panel.dataset.lang===language && list.some(q=>q.id===focused&&q.answerable) &&
      document.activeElement.matches('textarea') && snapshot.connection==='live') return;
   panel.dataset.lang=language;
-  panel.innerHTML=list.map(q=>{
-    const label=inventory.find(term=>term.address===q.address)?.label||q.address;
-    const canAnswer=q.answerable&&snapshot.connection==='live'&&!questionSending.has(q.id);
-    const feedback=questionResults.get(q.id)||q.state;
-    const approvalTerm=inventory.find(term=>term.address===q.approval?.address);
-    return '<form class="question" data-question="'+q.id+'"><div><strong>'+escape(label)+'</strong><small> · '+copy(feedback)+'</small></div><p>'+escape(q.ask)+'</p>'
-      +(canAnswer?'<textarea name="answer" aria-label="'+copy('answerHint')+'" placeholder="'+copy('answerHint')+'" maxlength="2000" rows="2">'+escape(questionDrafts.get(q.id)||'')+'</textarea>'
-       +'<div class="controls">'+q.choices.map(choice=>'<button type="button" data-choice="'+escape(choice)+'">'+escape(choice)+'</button>').join('')+'<button type="submit">'+copy('answer')+'</button></div>':'')
-      +(q.approval?'<button type="button" data-approval '+(snapshot.connection==='live'&&approvalTerm?'':'disabled')+'>'
-       +copy(approvalTerm?'openApproval':'approvalUnavailable')+' · '+escape(approvalTerm?.label || q.approval.role)+'</button>':'')+'</form>';
-  }).join('');
+  panel.innerHTML=list.map(questionHTML).join('');
+}
+
+function questionHTML(q) {
+  const approvalTerm=inventory.find(term=>term.address===q.approval?.address);
+  return questionFormHTML(q,{label:inventory.find(term=>term.address===q.address)?.label||q.address,
+    canAnswer:q.answerable&&snapshot.connection==='live'&&!questionSending.has(q.id),
+    feedback:questionResults.get(q.id)||q.state, draft:questionDrafts.get(q.id)||'',
+    approvalLabel:approvalTerm?.label, live:snapshot.connection==='live'},copy,escape);
 }
 
 const participant = term => ({key:sessionKey(term),label:term.label,machine:machineFor(term),address:term.address});
@@ -1294,15 +1271,15 @@ function renderChatContext(term,room) {
       +'</b><small>'+escape(copy(latest.kind)+' · '+latest.body)+'</small></span><span aria-hidden="true">›</span></button>');
     if(changed&&fresh&&selectedTab==='chat')handoff.querySelector('.sheep').dataset.motion='handoff';
   }
-  const request=page==='conversations'?roomQuestions(room,term).at(-1):null;
+  const requests=page==='conversations'?roomQuestions(room,term):[];
+  const request=requests.at(-1);
   const waiting=[term,...(room?.members||[])].find(member=>member?.state==='live'&&member.status==='blocked');
   const approval=$('#inlineApproval');
   approval.hidden=!request&&!waiting || page!=='conversations';
+  const typing=approval.contains(document.activeElement)&&document.activeElement.matches('textarea')
+    &&keepTyping(requests,document.activeElement.closest('[data-question]')?.dataset.question,snapshot.connection==='live',questionSending);
   if(request){
-    const actor=inventory.find(member=>member.address===request.address)?.label||request.address;
-    const title=copy(request.approval?'approvalWaiting':'answerNeeded');
-    setPanel('#inlineApproval','<div class="chat-approval"><div><strong>'+escape(title+' · '+actor)+'</strong><p>'+escape(request.ask)
-      +'</p></div><button type="button" data-chat-question="'+escape(request.id)+'">'+copy(request.approval?.address&&snapshot.connection==='live'?'openApprovalHere':'viewQuestion')+'</button></div>');
+    if(!typing)setPanel('#inlineApproval','<div class="chat-questions">'+requests.map(questionHTML).join('')+'</div>');
   }else if(waiting){
     setPanel('#inlineApproval','<div class="chat-approval"><strong>'+escape(copy('due')+' · '+waiting.label)
       +'</strong><button type="button" data-waiting-terminal="'+escape(sessionKey(waiting))+'">'+copy('terminal')+'</button></div>');
@@ -1354,7 +1331,7 @@ function detail() {
   $('#terminalToggle').hidden=!inChat||!term;
   $('#terminalToggle').setAttribute('aria-expanded',String(inChat&&showTerminal));
   $('[data-tab=terminal]').hidden=inChat;
-  $('#tabs').hidden=inChat&&selectedTab!=='questions'&&!roomQuestions(room,term).some(q=>!q.approval);
+  $('#tabs').hidden=inChat;
 
   $('#transferPanel').hidden=selectedTab!=='activity';
   $('#questionPanel').hidden=selectedTab!=='questions';
@@ -2035,10 +2012,9 @@ function revealQuestions() {
     directoryOpen=true;
     $('.side').hidden=false;
   }
-  selectedTab='questions';
-  $('#arrival').hidden=true;
+  if(selectedTab==='questions')selectedTab=currentRoom()?'team':'chat';
   detail();
-  $('#questions').querySelector('textarea,button:not(:disabled)')?.focus();
+  $('#inlineApproval').querySelector('textarea,button:not(:disabled)')?.focus();
 }
 $('#inlineHandoff').addEventListener('click',()=>{
   selectedTab='team';
@@ -2103,11 +2079,12 @@ $('#transfers').addEventListener('click',event=>{
   const id=event.target.closest('[data-approve]')?.dataset.approve;
   if(id)checkApprovalTarget(id);
 });
-$('#questions').addEventListener('input',event=>{
+for(const panel of [$('#questions'),$('#inlineApproval')]){
+panel.addEventListener('input',event=>{
   const form=event.target.closest('[data-question]');
   if(form&&event.target.matches('textarea'))questionDrafts.set(form.dataset.question,event.target.value);
 });
-$('#questions').addEventListener('click',event=>{
+panel.addEventListener('click',event=>{
   const target=event.target.closest('button'), form=target?.closest('[data-question]');
   if(!form)return;
   if(target.hasAttribute('data-choice')){
@@ -2118,14 +2095,16 @@ $('#questions').addEventListener('click',event=>{
   }
   if(target.hasAttribute('data-approval'))checkApprovalTarget(form.dataset.question);
 });
-$('#questions').addEventListener('submit',event=>{
+panel.addEventListener('submit',event=>{
   event.preventDefault();
   const form=event.target,id=form.dataset.question,text=form.elements.answer?.value.trim();
   if(!text||questionSending.has(id))return;
   questionSending.add(id);
   post({type:'answer',id,text});
   showQuestions();
+  detail();
 });
+}
 $('#replay').addEventListener('click',()=>motion());
 document.addEventListener('visibilitychange',()=>{
   document.documentElement.toggleAttribute('data-inactive',document.hidden);
