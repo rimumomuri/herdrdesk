@@ -15,3 +15,8 @@ export function questionFormHTML(q, view, copy, escape) {
   return '<form class="question chat-question" data-question="' + q.id + '"><div><strong>' + escape(view.label) + '</strong><small> · '
     + copy(view.feedback) + '</small></div><p>' + escape(q.ask) + '</p>' + answer + approval + '</form>';
 }
+
+/** Skip re-rendering the chat's question cards while the person types in one that can still be answered as shown. */
+export function keepTyping(requests, focusedId, live, sending) {
+  return live && !sending.has(focusedId) && requests.some(q => q.id === focusedId && q.answerable);
+}

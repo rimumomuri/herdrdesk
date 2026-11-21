@@ -11,7 +11,7 @@ import { messageTag, awaitingResponse, tagHTML } from './message-tags.js';
 import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick } from './sound-rules.js';
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText } from './task-board.js';
-import { questionFormHTML } from './chat-questions.js';
+import { questionFormHTML, keepTyping } from './chat-questions.js';
 import { makeInventory, makeTeamDirectory, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
 import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
 import { enterAction } from './keys.js';
@@ -1277,7 +1277,7 @@ function renderChatContext(term,room) {
   const approval=$('#inlineApproval');
   approval.hidden=!request&&!waiting || page!=='conversations';
   const typing=approval.contains(document.activeElement)&&document.activeElement.matches('textarea')
-    &&requests.some(q=>q.id===document.activeElement.closest('[data-question]')?.dataset.question);
+    &&keepTyping(requests,document.activeElement.closest('[data-question]')?.dataset.question,snapshot.connection==='live',questionSending);
   if(request){
     if(!typing)setPanel('#inlineApproval','<div class="chat-questions">'+requests.map(questionHTML).join('')+'</div>');
   }else if(waiting){

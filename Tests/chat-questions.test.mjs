@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {questionFormHTML} from '../Resources/web/chat-questions.js';
+import {questionFormHTML, keepTyping} from '../Resources/web/chat-questions.js';
 
 const copy = key => ({answerHint:'답변 입력', answer:'답변', openApproval:'승인 창 열기', approvalUnavailable:'승인 창 없음', answerNeeded:'답변 필요'})[key] || key;
 const escape = text => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -29,4 +29,14 @@ test('an approval question offers to open the approval terminal, disabled when i
     /<button type="button" data-approval >승인 창 열기 · 킁킁 총괄<\/button>/);
   assert.match(questionFormHTML(approval, {label:'x', canAnswer:false, feedback:'answerNeeded', live:true}, copy, escape),
     /data-approval disabled>승인 창 없음 · kunkun-codex-lead/);
+});
+
+test('a focused answer field is kept only while that question can still be answered', () => {
+  const requests = [q];
+  assert.equal(keepTyping(requests, 'q1', true, new Set()), true);
+  assert.equal(keepTyping(requests, 'q1', false, new Set()), false, 'connection dropped');
+  assert.equal(keepTyping([{...q, answerable:false}], 'q1', true, new Set()), false, 'agent can no longer take it');
+  assert.equal(keepTyping(requests, 'q1', true, new Set(['q1'])), false, 'already sending');
+  assert.equal(keepTyping(requests, 'other', true, new Set()), false, 'not in this chat');
+  assert.equal(keepTyping(requests, undefined, true, new Set()), false);
 });
