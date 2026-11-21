@@ -46,4 +46,10 @@ final class MachineSettingsTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(MachineSettings.timeout(["machine", "clone"]), 900)
         XCTAssertLessThanOrEqual(MachineSettings.timeout(["machine", "set"]), 30)
     }
+
+    func testOnlyACloneRunsOnTheLongQueueSoSettingsAreNotHeldBehindIt() {
+        XCTAssertTrue(MachineSettings.isLong(["machine", "clone", "laptop"]))
+        XCTAssertFalse(MachineSettings.isLong(["machine", "set", "laptop", "--ready", "off"]))
+        XCTAssertFalse(MachineSettings.isLong(["machine", "suggest", "--team", "shop"]))
+    }
 }

@@ -50,7 +50,7 @@ public enum MachineSettings {
     }
 
     /// A clone may take minutes on a big repo; the rest only edits a small file.
-    public static func timeout(_ argv: [String]) -> TimeInterval {
-        argv.count > 1 && argv[1] == "clone" ? 960 : 20
-    }
+    public static func isLong(_ argv: [String]) -> Bool { argv.count > 1 && argv[1] == "clone" }
+
+    public static func timeout(_ argv: [String]) -> TimeInterval { isLong(argv) ? 960 : 20 }
 }

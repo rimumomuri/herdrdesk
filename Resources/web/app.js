@@ -9,7 +9,7 @@ import { shortRoleTitle, nextKey, chatHidden, foldLeadChats, inRoomConversation,
 import { buildChain, handoffCardsFor, handoffCardHTML, isDelegating } from './handoff-chain.js';
 import { messageTag, awaitingResponse, tagHTML } from './message-tags.js';
 import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick } from './sound-rules.js';
-import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams } from './computers.js';
+import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText } from './task-board.js';
 import { makeInventory, makeTeamDirectory, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
 import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
@@ -2179,12 +2179,20 @@ $('#computerSheet').addEventListener('change',event=>{
   if(field.id==='computerReady')saveComputerSetting({ready:field.checked?'on':'off'});
   else if(field.id==='computerTier')saveComputerSetting({tier:field.value});
   else if(field.id==='computerSlots'){
-    const slots=Number(field.value);
-    if(Number.isInteger(slots)&&slots>=0&&slots<=64)saveComputerSetting({slots});
-  }else if(field.id==='computerCloneTeam'&&field.value){
-    const team=field.value;
+    const slots=slotsValue(field.value);
+    if(slots===null)renderComputerSheet(true);   // emptied or invalid: show the saved value again, change nothing
+    else saveComputerSetting({slots});
+  }else if(field.id==='computerCloneTeam'){
+    // the previous team's URL and folder must never be sent for this team: clear now, hold Receive until the lookup ends
+    const form=$('#computerCloneForm'),team=field.value;
+    $('#computerCloneUrl').value='';$('#computerClonePath').value='';
+    if(!team){delete form.dataset.suggesting;$('#computerCloneSubmit').disabled=false;return;}
+    form.dataset.suggesting=team;
+    $('#computerCloneSubmit').disabled=true;
     machineRequest({action:'suggest',team},result=>{
-      if($('#computerCloneTeam')?.value!==team)return;
+      if(!form.isConnected||form.dataset.suggesting!==team)return;
+      delete form.dataset.suggesting;
+      $('#computerCloneSubmit').disabled=false;
       if(!result.ok){computerMessage(copy('computerSuggestFailed'));return;}
       $('#computerCloneUrl').value=result.result?.url||'';
       $('#computerClonePath').value=result.result?.path||'';
@@ -2195,8 +2203,8 @@ $('#computerSheet').addEventListener('submit',event=>{
   if(event.target.id!=='computerCloneForm')return;
   event.preventDefault();
   const form=event.target,name=computerOpen;
-  const request={action:'clone',name,team:$('#computerCloneTeam').value,url:$('#computerCloneUrl').value.trim(),path:$('#computerClonePath').value.trim()};
-  if(!request.team||!request.url||!request.path)return;
+  const request=cloneRequest({name,team:$('#computerCloneTeam').value,url:$('#computerCloneUrl').value,path:$('#computerClonePath').value,suggesting:form.dataset.suggesting});
+  if(!request)return;
   form.dataset.busy='1';
   $('#computerCloneSubmit').disabled=true;
   $('#computerCloneStatus').textContent=copy('computerCloning');

@@ -87,3 +87,22 @@ test('cloneTeams also offers teams with a Mac Studio repo even when no lead is l
   assert.deepEqual(cloneTeams([{id:'shop', title:'Shop'}], [], {}, {shop:'/u/shop'}), [{id:'shop', title:'Shop'}]);
   assert.deepEqual(computerRows([{name:'local', ready:true, projects:'*', repos:{shop:'/u/shop'}}], [], [])[0].repos, {shop:'/u/shop'});
 });
+
+import {slotsValue, cloneRequest} from '../Resources/web/computers.js';
+
+test('an emptied worker count is not saved; an explicit 0 is', () => {
+  assert.equal(slotsValue(''), null);
+  assert.equal(slotsValue('  '), null);
+  assert.equal(slotsValue('0'), 0);
+  assert.equal(slotsValue('5'), 5);
+  assert.equal(slotsValue('65'), null);
+  assert.equal(slotsValue('1.5'), null);
+});
+
+test('no clone is sent while the chosen team is still being looked up', () => {
+  const form = {name:'laptop', team:'cafe', url:' https://x/cafe.git ', path:'~/cafe'};
+  assert.deepEqual(cloneRequest(form), {action:'clone', name:'laptop', team:'cafe', url:'https://x/cafe.git', path:'~/cafe'});
+  assert.equal(cloneRequest({...form, suggesting:'cafe'}), null);
+  assert.equal(cloneRequest({...form, url:''}), null);
+  assert.equal(cloneRequest({...form, team:''}), null);
+});

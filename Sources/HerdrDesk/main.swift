@@ -42,7 +42,9 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
     }()
     private var taskBoard: [String: Any] = [:]
     private lazy var taskExecutable: String? = ProcessHc.resolveExecutable("herdr-task", overrides: [ProcessInfo.processInfo.environment["HERDRDESK_TASK"]])
+    /// Settings edits stay quick on their own queue; clones (minutes) run apart so they never hold a setting back.
     private let machineQueue = DispatchQueue(label: "herdrdesk.machines", qos: .userInitiated)
+    private let cloneQueue = DispatchQueue(label: "herdrdesk.machines.clone", qos: .userInitiated, attributes: .concurrent)
     private let taskQueue = DispatchQueue(label: "herdrdesk.tasks", qos: .utility)
     private var taskPolling = false
     private var taskVersion = 0
@@ -548,7 +550,7 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
             guard environment["HERDRDESK_NO_SEND"] != "1", window.isKeyWindow, NSApp.isActive,
                   let argv = MachineSettings.argv(body, terms: candidates) else { reply(["ok": false, "error": "refused"]); return }
             guard let exe = taskExecutable else { reply(["ok": false, "error": "herdr-task not found"]); return }
-            machineQueue.async {
+            (MachineSettings.isLong(argv) ? cloneQueue : machineQueue).async {
                 let result = ProcessHc(path: exe).run(argv, timeout: MachineSettings.timeout(argv))
                 let parsed = result.out.split(separator: "\n").last.flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) }
                 DispatchQueue.main.async {

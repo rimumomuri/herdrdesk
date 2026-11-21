@@ -74,3 +74,18 @@ export function computerSheetHTML(row, teams, copy, escape) {
     + '<p id="computerCloneStatus" class="computer-status" role="status"></p>'
     + '<div><button type="submit" class="primary" id="computerCloneSubmit">' + escape(copy('computerCloneSubmit')) + '</button></div></form>';
 }
+
+/** Worker count typed in the sheet: an integer 0–64, or null (empty or invalid input is not saved). */
+export function slotsValue(text) {
+  const value = String(text ?? '').trim();
+  if (!/^\d{1,2}$/.test(value)) return null;
+  const slots = Number(value);
+  return slots <= 64 ? slots : null;
+}
+
+/** The clone request for the form, or null while the chosen team's lookup is pending or a field is empty. */
+export function cloneRequest({ name, team, url, path, suggesting }) {
+  const request = { action: 'clone', name, team, url: String(url || '').trim(), path: String(path || '').trim() };
+  if (suggesting || !team || !request.url || !request.path) return null;
+  return request;
+}
