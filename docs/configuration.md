@@ -85,7 +85,7 @@ When `machines` is present, each computer in the **Computers** list opens a sett
 |---|---|
 | Take card work on/off, work weight, workers at once | `herdr-task machine set <name> [--ready on\|off] [--tier heavy\|light] [--slots N]` |
 | Choose a team to receive | `herdr-task machine suggest --team <team>` → `{"url": "...", "path": "~/..."}` |
-| Receive | `herdr-task machine clone <name> --team <team> --url <url> --path <path>` (up to 16 minutes) |
+| Receive | `herdr-task machine clone <name> --team <team> --url <url> --path <path>` (up to 10 minutes, the Herdr Core remote command limit) |
 | Remove | `herdr-task machine unlink <name> --team <team>` (the files stay) |
 
 Exit code 0 with a JSON line means success. Any other exit code is shown as not done, with the standard error text. HerdrDesk checks each field before running the command (names, `on`/`off`, `heavy`/`light`, 0–64 workers, a URL and a folder starting with `~/` or `/`, no control characters), and the sheet is read-only when `HERDRDESK_NO_SEND=1`. Your `herdr-task` decides what a change means: the reference implementation clones over the Herdr Core connection, refuses a folder that already holds something else, registers an existing clone of the same repository without touching it, keeps the previous list as `machines.json.bak`, and does not install dependencies.
