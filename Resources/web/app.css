@@ -1275,3 +1275,23 @@ button.computer-row:hover, button.computer-row:focus-visible { background:#fffff
 .chat-image figcaption{font-size:11px;line-height:1.4;overflow-wrap:anywhere;color:var(--muted)}
 .chat-image-fallback{font-size:12px;line-height:1.5;color:var(--muted)}
 .chat-image-pending{display:block;width:1px;height:1px}
+
+/* Light, immediate feedback: quick press, soft hover, short entrances. Nothing here carries meaning. */
+button,summary,.board-card,.directory-row,select,textarea,input {
+  transition:background-color 120ms var(--motion-ease),border-color 120ms var(--motion-ease),color 120ms var(--motion-ease),
+             opacity 120ms var(--motion-ease),transform 160ms var(--motion-ease),box-shadow 160ms var(--motion-ease);
+}
+button:not(:disabled):active,summary:active { transform:scale(.97); transition-duration:80ms }
+#tabs button:not(:disabled):active,.hop:not(:disabled):active { transform:none }
+.board-card:not(:disabled):hover,.directory-row:hover,[data-room]:hover,[data-direct]:hover { background-color:#ffffff0a }
+textarea:focus,input:focus,select:focus { border-color:#6a6a73 }
+dialog[open] { animation:desk-pop 160ms var(--motion-ease) }
+dialog[open]::backdrop { animation:desk-fade 160ms var(--motion-ease) }
+details.settings[open] .settings-menu { animation:desk-pop 140ms var(--motion-ease); transform-origin:top right }
+@keyframes desk-pop { from { opacity:0; transform:scale(.97) } to { opacity:1; transform:none } }
+@keyframes desk-fade { from { opacity:0 } to { opacity:1 } }
+@media(prefers-reduced-motion:reduce) {
+  button,summary,.board-card,.directory-row,select,textarea,input { transition:none }
+  button:not(:disabled):active,summary:active { transform:none }
+  dialog[open],dialog[open]::backdrop,details.settings[open] .settings-menu { animation:none }
+}
