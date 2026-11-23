@@ -13,6 +13,7 @@ import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsVa
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText } from './task-board.js';
 import { questionFormHTML, keepTyping } from './chat-questions.js';
 import { sendBlocked, deferredSaver } from './composer.js';
+import { freshEntries } from './motion.js';
 import { makeInventory, makeTeamDirectory, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
 import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
 import { enterAction } from './keys.js';
@@ -167,6 +168,20 @@ const roomUnread=new Map();
 const assignmentMotion=new Map();
 let pendingActivityTimer;
 const motionPreference=matchMedia("(prefers-reduced-motion: reduce)");
+// Short entrance motion for new messages, question cards and switched conversations. Off with Reduce Motion.
+const seenEntries=new Map();
+const RISE=[{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}];
+const POP=[{opacity:0,transform:'scale(.97)'},{opacity:1,transform:'none'}];
+const FADE=[{opacity:.2},{opacity:1}];
+function enter(nodes,frames,duration){
+  if(motionPreference.matches||document.hidden)return;
+  for(const node of nodes)node.animate?.(frames,{duration,easing:'cubic-bezier(.22,.64,.28,1)'});
+}
+function enterFresh(panel,scope,attribute,frames,duration){
+  const nodes=[...panel.querySelectorAll('['+attribute+']')];
+  const fresh=new Set(freshEntries(scope,nodes.map(node=>node.getAttribute(attribute)),seenEntries));
+  enter(nodes.filter(node=>fresh.has(node.getAttribute(attribute))),frames,duration);
+}
 let timelineRoom=null;
 const assignedTeams=()=>snapshot.configuredTeams||[];
 const memberPages=new Map();
@@ -715,6 +730,8 @@ function renderRoomFeed(room) {
       +'</small></header>'+renderChatText(row.body)+messageImages(row)+lineageMarkup(snapshot.lineage,'room:'+room.id,row.id,inventory,snapshot.ledger||{},copy)+'</article>';
   }).join('') || '<p class="muted">'+copy('teamFeedEmpty')+'</p>';
   const updated=setPanel('#roomFeed',html);
+  if(updated)enterFresh(panel,'room:'+room.id,'data-feed',RISE,180);
+  if(!sameRoom&&timelineRoom)enter([panel],FADE,140);
   observeChatImages();
   if(updated)restoreProgress(panel);
   if(updated&&!panel.hidden&&sameRoom && !matchMedia('(prefers-reduced-motion: reduce)').matches){
@@ -1122,8 +1139,11 @@ function updateComposer() {
     +'</small>'+renderChatText(entry.text)+messageImages(entry)+(showConversation?lineageMarkup(snapshot.lineage,directConversationId(term),entry.id,inventory,snapshot.ledger||{},copy):'')+'</div>').join('') || (showConversation?'<p class="chat-empty">'+copy('chatEmpty')+'</p>':'');
   renderAttachments(term);
   if (content !== log.dataset.signature || log.dataset.target !== key) {
-    const follow = transcript.scrollHeight-transcript.scrollTop-transcript.clientHeight<48 || log.dataset.target!==key;
+    const switched = log.dataset.target!==key;
+    const follow = transcript.scrollHeight-transcript.scrollTop-transcript.clientHeight<48 || switched;
     log.innerHTML = content;
+    enterFresh(log,'chat:'+key,'data-record-id',RISE,180);
+    if(switched&&log.dataset.target)enter([log],FADE,140);
     restoreProgress(log);
     observeChatImages();
     log.dataset.signature = content;
@@ -1293,7 +1313,8 @@ function renderChatContext(term,room) {
   const typing=approval.contains(document.activeElement)&&document.activeElement.matches('textarea')
     &&keepTyping(requests,document.activeElement.closest('[data-question]')?.dataset.question,snapshot.connection==='live',questionSending);
   if(request){
-    if(!typing)setPanel('#inlineApproval','<div class="chat-questions">'+requests.map(questionHTML).join('')+'</div>');
+    if(!typing&&setPanel('#inlineApproval','<div class="chat-questions">'+requests.map(questionHTML).join('')+'</div>'))
+      enterFresh(approval,'questions','data-question',POP,160);
   }else if(waiting){
     setPanel('#inlineApproval','<div class="chat-approval"><strong>'+escape(copy('due')+' · '+waiting.label)
       +'</strong><button type="button" data-waiting-terminal="'+escape(sessionKey(waiting))+'">'+copy('terminal')+'</button></div>');

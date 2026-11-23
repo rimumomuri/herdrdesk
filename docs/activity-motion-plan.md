@@ -18,6 +18,7 @@ Use an original, side-facing sheep with rounded wool, a slate face, one ear and 
 | Recorded handoff or reply | Show a compact sender-to-recipient row. The sheep passes a paper card once when the row arrives. Open Shared & Handoffs for the full timeline. |
 | New question or approval | The question card appears in its conversation. The conversation list keeps a static amber count until the request is handled. |
 | Unread result or share | A blue dot shows that the corresponding chat or timeline has something new. Working, unread and pending approval are independent states. |
+| Buttons, messages and windows | A button shrinks slightly (97%) while pressed and springs back in 0.16 s; hover backgrounds fade in 0.12 s. Only newly arrived messages and question cards rise or pop in (0.16–0.18 s); re-renders never replay them. Switching conversations fades the content in 0.14 s, and dialogs pop open. |
 | Reduced motion | Keep the same static sheep and state text. No movement is required to interpret a state. |
 
 Show the larger sheep only beside the active conversation. The sidebar uses a reduced silhouette and compact indicators. The status is based on Herdr's reported state, with no simulated progress percentage.
