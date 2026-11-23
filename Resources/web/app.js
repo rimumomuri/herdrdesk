@@ -12,6 +12,7 @@ import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick } from './sou
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest, mainMachineLabel } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText } from './task-board.js';
 import { questionFormHTML, keepTyping } from './chat-questions.js';
+import { sendBlocked, deferredSaver } from './composer.js';
 import { makeInventory, makeTeamDirectory, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
 import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
 import { enterAction } from './keys.js';
@@ -107,13 +108,21 @@ const attachmentPending=new Map();
 const attachmentNotices=new Map();
 // Drafts belong to one terminal session; an old role-keyed draft is shown only while that role is unambiguous.
 const draftValue=term=>draftFor(term,inventory,drafts,legacyDrafts);
-function storeDraft(term,value){
+let legacyDraftsDirty=false;
+function persistDrafts(){
+  const saved=!legacyDraftsDirty||save('drafts.v1',legacyDrafts);
+  legacyDraftsDirty=false;
+  if(!save(draftsKey,drafts)||!saved)showNotice('saveFailed');
+}
+// Typing updates drafts in memory at once and writes them to storage once it pauses.
+const draftSaver=deferredSaver(persistDrafts,400);
+function storeDraft(term,value,typing=false){
   const next=storeDraftFor(term,inventory,drafts,legacyDrafts,value);
   const legacyChanged=Object.keys(next.legacy).length!==Object.keys(legacyDrafts).length;
   Object.keys(drafts).forEach(key=>delete drafts[key]); Object.assign(drafts,next.drafts);
-  let saved=true;
-  if(legacyChanged){ Object.keys(legacyDrafts).forEach(key=>delete legacyDrafts[key]); Object.assign(legacyDrafts,next.legacy); saved=save('drafts.v1',legacyDrafts); }
-  if(!save(draftsKey,drafts)||!saved)showNotice('saveFailed');
+  if(legacyChanged){ Object.keys(legacyDrafts).forEach(key=>delete legacyDrafts[key]); Object.assign(legacyDrafts,next.legacy); legacyDraftsDirty=true; }
+  if(typing)draftSaver.schedule();
+  else{ draftSaver.flush(); persistDrafts(); }
 }
 const deliveries = load(deliveriesKey, []).map(item => item.state === 'sending' ? { ...item, state: 'needsCheck' } : item);
 const copy = key => t(key, language);
@@ -1084,13 +1093,18 @@ function personalChatEntries(term){
   return entries;
 }
 
+function updateSendButton(term=active(), history=viewed()) {
+  $('#send').disabled = sendBlocked({inputDisabled:$('#draft').disabled, text:$('#draft').value, files:filesFor(term).length,
+    loadingFiles:pendingFiles(sessionKey(term)), sending:history.some(record => record.state === 'sending')});
+}
+
 function updateComposer() {
   const term = active();
   const key = sessionKey(term);
   const history = viewed();
   const item = history.at(-1);
   $('#draft').disabled = !sendable(term,snapshot.connection);
-  $('#send').disabled = $('#draft').disabled || (!$('#draft').value.trim()&&!filesFor(term).length) || pendingFiles(key)>0 || history.some(record => record.state === 'sending');
+  updateSendButton(term, history);
   $('#draft').setAttribute('aria-description',copy('imageInput'));
   $('#draft').placeholder = term?.program?.agent ? copy('sendMessageTo').replace('{name}',()=>term.label) : copy('chatUnavailable');
   $('#sendStatus').textContent = item&&item.state!=='sent' ? copy(item.state) : '';
@@ -1483,10 +1497,11 @@ $('#draft').addEventListener('keydown',event=>{
   if(action==='swallow'||action==='send')event.preventDefault();
   if(action==='send'&&!$('#send').disabled)$('#composer').requestSubmit($('#send'));
 });
+// Per keystroke only the draft and the send button change; the chat history is not rebuilt.
 $('#draft').addEventListener('input',event=>{
   const term=active();
-  if(term)storeDraft(term,event.target.value);
-  updateComposer();
+  if(term)storeDraft(term,event.target.value,true);
+  updateSendButton(term);
 });
 $('#attachmentList').addEventListener('click',event=>{
   const id=event.target.closest('[data-remove]')?.dataset.remove,term=active();
@@ -2107,12 +2122,13 @@ panel.addEventListener('submit',event=>{
 }
 $('#replay').addEventListener('click',()=>motion());
 document.addEventListener('visibilitychange',()=>{
+  if(document.hidden)draftSaver.flush();
   document.documentElement.toggleAttribute('data-inactive',document.hidden);
   renderRooms();
   detail();
 });
 motionPreference.addEventListener('change',()=>{renderRooms();detail();});
-window.addEventListener('pagehide',()=>terminalView.stop());
+window.addEventListener('pagehide',()=>{draftSaver.flush();terminalView.stop();});
 
 // Computer settings sheet: edits machines.json through `herdr-task machine ...` (Swift checks every field).
 let computerOpen=null,machineToken=0;
