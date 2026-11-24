@@ -75,6 +75,16 @@ final class HandoffTests: XCTestCase {
         XCTAssertEqual(book.cards.last?.kind, "assign")
     }
 
+    func testRequestAfterAStaleHandoffIsStillAHandoff() {
+        let book = HandoffBook()
+        book.record(msg(prod, lead, t0, "question"))
+        book.observe(signals([:]), now: t0 + HandoffBook.staleAfter + 1)
+        XCTAssertEqual(book.edges[0].state, "stale")
+        book.record(msg(lead, prod, t0 + HandoffBook.staleAfter + 60_000, "please check this"))
+        XCTAssertEqual(book.edges.count, 2)
+        XCTAssertEqual(book.cards.last?.kind, "assign")
+    }
+
     func testLateAnswerOpensAHandoffAsBefore() {
         let book = HandoffBook()
         book.record(msg(prod, lead, t0, "question"))

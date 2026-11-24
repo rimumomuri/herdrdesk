@@ -132,7 +132,7 @@ public final class HandoffBook {
         // it is not new work, so a busy receiver must not keep it "waiting" for hours.
         if m.from != .desk, m.to != .desk,
            let i = edges.lastIndex(where: { ($0.from.same(m.to) && $0.to.same(m.from)) || ($0.from.same(m.from) && $0.to.same(m.to)) }),
-           edges[i].from.same(m.to), !edges[i].isOpen, let ended = edges[i].closedAt, m.at - ended <= Self.answerWindow,
+           edges[i].from.same(m.to), edges[i].state == "closed", let ended = edges[i].closedAt, m.at - ended <= Self.answerWindow,
            cards.last(where: { $0.id.hasPrefix("c:\(edges[i].id):") })?.from.same(m.to) ?? true {
             _ = addCard(edges[i], at: m.at, kind: "reply", from: m.from, to: m.to, body: body)
             return
