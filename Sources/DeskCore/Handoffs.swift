@@ -128,12 +128,12 @@ public final class HandoffBook {
             _ = addCard(edges[i], at: m.at, kind: "message", from: m.from, to: m.to, body: body)
             return
         }
-        // The first word back on something the other side handed over (and that has finished) answers it:
+        // The first answer to something the other side handed over (and that really finished) joins it:
         // it is not new work, so a busy receiver must not keep it "waiting" for hours.
         if m.from != .desk, m.to != .desk,
            let i = edges.lastIndex(where: { ($0.from.same(m.to) && $0.to.same(m.from)) || ($0.from.same(m.from) && $0.to.same(m.to)) }),
            edges[i].from.same(m.to), edges[i].state == "closed", let ended = edges[i].closedAt, m.at - ended <= Self.answerWindow,
-           cards.last(where: { $0.id.hasPrefix("c:\(edges[i].id):") })?.from.same(m.to) ?? true {
+           !cards.contains(where: { $0.id.hasPrefix("c:\(edges[i].id):") && $0.kind == "reply" && $0.from.same(m.from) }) {
             _ = addCard(edges[i], at: m.at, kind: "reply", from: m.from, to: m.to, body: body)
             return
         }

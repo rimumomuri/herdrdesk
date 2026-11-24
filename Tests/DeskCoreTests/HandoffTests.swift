@@ -85,6 +85,18 @@ final class HandoffTests: XCTestCase {
         XCTAssertEqual(book.cards.last?.kind, "assign")
     }
 
+    func testAcknowledgedAnswerDoesNotMakeTheNextTaskAnAnswer() {
+        let book = HandoffBook()
+        book.record(msg(prod, lead, t0, "question"))
+        book.observe(signals(["t1":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t1":"idle"]), now: t0 + 60_000)
+        book.record(msg(lead, prod, t0 + 90_000, "answer"))
+        book.record(msg(prod, lead, t0 + 100_000, "thanks, got it"))
+        book.record(msg(lead, prod, t0 + 1_200_000, "now build the next screen"))
+        XCTAssertTrue(book.edges.last?.isOpen ?? false)
+        XCTAssertEqual(book.cards.last?.kind, "assign")
+    }
+
     func testLateAnswerOpensAHandoffAsBefore() {
         let book = HandoffBook()
         book.record(msg(prod, lead, t0, "question"))
