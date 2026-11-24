@@ -17,7 +17,7 @@ import { questionFormHTML, keepTyping } from './chat-questions.js';
 import { sendBlocked, deferredSaver } from './composer.js';
 import { freshEntries } from './motion.js';
 import { stickyScroll } from './chat-scroll.js';
-import { makeInventory, makeTeamDirectory, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
+import { makeInventory, makeTeamDirectory, listedGroup, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
 import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
 import { enterAction } from './keys.js';
 import { createTerminalView } from './terminal-view.js';
@@ -419,7 +419,8 @@ function rooms() {
     const role=legacyDraftKey(term);
     if(role&&!group.roles.has(role))group.roles.set(role,term.label);
   }
-  return [...groups.values()];
+  const configured=new Set(assignedTeams().map(team=>team.id));
+  return [...groups.values()].filter(group=>listedGroup(group.members,configured.has(group.id)));
 }
 
 const currentRoom=()=>page==='conversations'&&roomID ? rooms().find(room=>room.id===roomID) : null;
@@ -583,7 +584,7 @@ function renderRooms(){
   if(folded.changed){pinnedChats.clear();for(const key of folded.pins)pinnedChats.add(key);save(pinKey,[...pinnedChats]);}
   rows.splice(0,rows.length,...folded.rows);
   sidebarRows=new Map(rows.map(row=>[row.key,row]));
-  setPanel('#computerStrip',computerStripHTML(computerRows(snapshot.tasks?.machines||[],snapshot.machines||[],inventory),copy,escape));
+  setPanel('#computerStrip',computerStripHTML(computerRows(snapshot.tasks?.machines||[],snapshot.machines||[],inventory,workingNow),copy,escape));
   renderComputerSheet();
   const shown=rows.filter(row=>!chatHidden(row,chatPreferences.get(row.key)));
   const pinned=[...pinnedChats].reverse().map(key=>sidebarRows.get(key)).filter(row=>row&&!chatHidden(row,chatPreferences.get(row.key)));
@@ -2236,7 +2237,7 @@ function machineRequest(request,done){
   machinePending.set(token,done);
   post({type:'machine',token,...request});
 }
-const computerRowFor=name=>computerRows(snapshot.tasks?.machines||[],snapshot.machines||[],inventory).find(row=>row.name===name&&row.editable);
+const computerRowFor=name=>computerRows(snapshot.tasks?.machines||[],snapshot.machines||[],inventory,workingNow).find(row=>row.name===name&&row.editable);
 const computerMessage=text=>{$('#computerMessage').textContent=text||'';};
 const machineFailure=result=>copy('computerFailed')+(result.error||'');
 function renderComputerSheet(force=false){

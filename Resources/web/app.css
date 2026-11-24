@@ -1257,6 +1257,8 @@ main[data-page=conversations] .feed-row[data-transfer] { max-width:min(100%,880p
 .computer-row b { font-weight:600 }
 .computer-row small { color:var(--muted) }
 .computer-load { margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums }
+.computer-parked { margin-left:auto; font-size:10px; color:var(--muted); opacity:.75; white-space:nowrap }
+.computer-parked + .computer-load { margin-left:6px }
 .computer-role { padding:0 5px; border-radius:4px; font-size:10px; line-height:15px; color:var(--muted); border:1px solid #ffffff1f }
 .computer-role[data-main=true] { color:var(--ink); border-color:#5fd6a366; background:#5fd6a31f; font-weight:650 }
 .computer-main-note { margin:2px 0 8px; font-size:12px; font-weight:600; color:#5fd6a3 }

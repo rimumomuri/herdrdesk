@@ -82,13 +82,13 @@ test('an explicit question is counted and its linked approval address needs an e
   assert.equal(registeredQuestions([asker,target,terminal('peer/t3','operator')],{},now)[0].approval.address,null);
 });
 
-import { makeTeamDirectory } from '../Resources/web/model.js';
+import { makeTeamDirectory, listedGroup } from '../Resources/web/model.js';
 
 test('directory preserves registered roles, nested reporting and unmatched terminals', () => {
   const setup=[{id:'release',title:'Release',lead:'lead',roles:[['lead','Lead'],['qa','QA'],['device','Device']],parents:{device:'qa'}}];
   const inventory=makeInventory([
     terminal('t1','lead'),terminal('t2','qa'),{...terminal('t3','extra'),parent:'t2'},
-    {address:'t4',name:'Shell',session:'2:4',state:'live'}
+    {address:'t4',name:'Helper',session:'2:4',state:'live',program:{agent:true}}
   ],[],setup);
   const [group,other]=makeTeamDirectory(inventory,setup);
   const [lead]=group.roots;
@@ -161,4 +161,21 @@ test('a herdr-reply copy merges even when the final adds code ticks and line bre
     body:'t1p가 flow `f2026` 을 **done**으로 닫았고,\n\n제품 재실행은 없었습니다.',at:'2026-11-20T04:51:50Z'};
   const explicit = {id:'explicit2',kind:'reply',role:'lead',session:'s1',body:'t1p가 flow f2026을 done으로 닫았고, 제품 재실행은 없었습니다.',at:'2026-11-20T04:51:45Z'};
   assert.deepEqual(mergeConversationRecords([explicit],[final]).map(x=>x.id),['auto2']);
+});
+
+test('a workspace holding only plain shells is not listed as a team; one with an agent still is', () => {
+  const spaces=[{name:'~',machine:'macbook-m6',tabs:[{name:'1',terminals:['t1']}]},{name:'scratch',machine:'',tabs:[{name:'1',terminals:['t7']}]}];
+  const inventory=makeInventory([
+    {address:'macbook-m6/t1',name:null,session:'1:1',state:'live',program:{agent:false},status:'unknown',labels:{}},
+    {address:'t7',name:'helper',session:'7:7',state:'live',program:{agent:true},status:'idle',labels:{}},
+  ],spaces,[]);
+  const titles=makeTeamDirectory(inventory,[]).map(group=>group.title);
+  assert.ok(!titles.includes('~'), 'shell-only workspace hidden');
+  assert.ok(titles.includes('scratch'), 'workspace with an agent kept');
+});
+
+test('a group is listed when it is a configured team or has at least one agent', () => {
+  assert.equal(listedGroup([{program:{agent:false}}], false), false);
+  assert.equal(listedGroup([{program:{agent:false}}, {program:{agent:true}}], false), true);
+  assert.equal(listedGroup([], true), true);
 });

@@ -11,9 +11,9 @@ const profiles = [
 test('each computer shows connection, readiness and card workers in use', () => {
   const live = [{name:'macbook-m6', state:'connected'}, {name:'macbook-pro', state:'unreachable'}];
   const terms = [
-    {address:'t5', machine:'', state:'live', labels:{'task.spawned':'1'}},
+    {address:'t5', machine:'', state:'live', status:'working', labels:{'task.spawned':'1'}},
     {address:'t6', machine:'', state:'live', labels:{}},
-    {address:'macbook-pro/t1', machine:'macbook-pro', state:'live', labels:{'task.spawned':'1'}},
+    {address:'macbook-pro/t1', machine:'macbook-pro', state:'live', status:'working', labels:{'task.spawned':'1'}},
   ];
   const rows = computerRows(profiles, live, terms);
   assert.deepEqual(rows.map(r => [r.name, r.state, r.used, r.slots]), [
@@ -135,4 +135,33 @@ test('local terminals are labelled with the main computer name, not "local"', ()
   assert.equal(mainMachineLabel(profiles, copy), 'Mac Studio (computerMain)');
   assert.equal(mainMachineLabel([{name:'local'}], copy), null);
   assert.equal(mainMachineLabel([], copy), null);
+});
+
+test('the count is workers actually running; finished workers still holding a seat show apart as waiting', () => {
+  const terms = [
+    {address:'macbook-m6/t5', machine:'macbook-m6', state:'live', status:'done', labels:{'task.spawned':'1'}},
+    {address:'macbook-m6/t6', machine:'macbook-m6', state:'live', status:'working', labels:{'task.spawned':'1'}},
+    {address:'macbook-m6/t7', machine:'macbook-m6', state:'live', status:'idle', labels:{'task.spawned':'1'}},
+  ];
+  const [, m6] = computerRows(profiles, [{name:'macbook-m6', state:'connected'}], terms);
+  assert.deepEqual([m6.used, m6.parked], [1, 2]);
+  const html = computerStripHTML([m6], key => ({computerParked:'대기 {n}'})[key] || key, text => String(text));
+  assert.match(html, /<span class="computer-load">1\/4<\/span>/);
+  assert.match(html, /<span class="computer-parked"[^>]*>대기 2<\/span>/);
+  const idle = computerStripHTML([{...m6, used:0, parked:0}], key => key, text => String(text));
+  assert.doesNotMatch(idle, /computer-parked/);
+});
+
+test('running is decided by the caller, so a fresh provider turn overrides a stale core status either way', () => {
+  const terms = [
+    {address:'macbook-m6/t5', machine:'macbook-m6', state:'live', status:'done', labels:{'task.spawned':'1'}},
+    {address:'macbook-m6/t6', machine:'macbook-m6', state:'live', status:'working', labels:{'task.spawned':'1'}},
+  ];
+  const effective = term => term.address === 'macbook-m6/t5';   // t5 really works, t6's working was cleared
+  const [, m6] = computerRows(profiles, [{name:'macbook-m6', state:'connected'}], terms, effective);
+  assert.deepEqual([m6.used, m6.parked], [1, 1]);
+  const [, flipped] = computerRows(profiles, [{name:'macbook-m6', state:'connected'}], terms, term => term.address === 'macbook-m6/t6');
+  assert.deepEqual([flipped.used, flipped.parked], [1, 1]);
+  const [, none] = computerRows(profiles, [{name:'macbook-m6', state:'connected'}], terms, () => false);
+  assert.deepEqual([none.used, none.parked], [0, 2]);
 });
