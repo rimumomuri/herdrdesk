@@ -10,7 +10,7 @@ import { buildChain, handoffCardsFor, handoffCardHTML, isDelegating } from './ha
 import { messageTag, awaitingResponse, tagHTML } from './message-tags.js';
 import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick } from './sound-rules.js';
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest, mainMachineLabel } from './computers.js';
-import { boardColumns, teamCounts, boardCardHTML, teamCountsText } from './task-board.js';
+import { boardColumns, teamCounts, boardCardHTML, teamCountsText, boardSummaryHTML, BOARD_LABELS } from './task-board.js';
 import { questionFormHTML, keepTyping } from './chat-questions.js';
 import { sendBlocked, deferredSaver } from './composer.js';
 import { freshEntries } from './motion.js';
@@ -172,6 +172,8 @@ const motionPreference=matchMedia("(prefers-reduced-motion: reduce)");
 // Short entrance motion for new messages, question cards and switched conversations. Off with Reduce Motion.
 const seenEntries=new Map();
 // Chats follow the newest message until the person scrolls up; then a "to the bottom" button appears.
+const CHEVRON='<svg class="board-chevron" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+let boardOpen=load('ui.boardOpen.v1',false)===true;
 const DOWN='<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 2v7M2.5 6 6 9.5 9.5 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function showToBottom(selector,{stuck,unseen}){
   const button=$(selector);
@@ -712,13 +714,28 @@ function renderTaskBoard(room,show){
   const name=address=>{const term=boardOwnerTerm(address);return term?.label||address;};
   const portrait=address=>{const term=boardOwnerTerm(address);return term?agentPortrait(term):'';};
   const columns=boardColumns(team,Date.now());
-  const label={queued:'boardQueued',working:'boardWorking',review:'boardReview',blocked:'boardBlocked',done:'boardDone'};
-  setPanel('#taskBoard',(team.warnings?.length?'<p class="board-warning">'+escape(copy('boardWarning'))+'</p>':'')
+  const scrolled=panel.querySelector('.board-inner');
+  const offset=scrolled?[scrolled.scrollTop,scrolled.scrollLeft]:null;
+  const changed=setPanel('#taskBoard','<button type="button" class="board-toggle" aria-controls="boardBody">'
+    +'<span class="board-summary">'+boardSummaryHTML(columns,copy)+'</span>'
+    +'<span class="board-toggle-label" data-when="closed">'+escape(copy('boardExpand'))+'</span>'
+    +'<span class="board-toggle-label" data-when="open">'+escape(copy('boardCollapse'))+'</span>'+CHEVRON+'</button>'
+    +'<div class="board-body" id="boardBody"><div class="board-inner">'
+    +(team.warnings?.length?'<p class="board-warning">'+escape(copy('boardWarning'))+'</p>':'')
     +'<div class="board-columns" aria-label="'+escape(copy('boardTitle'))+'">'+columns.map(column=>
-      '<section class="board-column" data-board-state="'+column.state+'"><h3>'+escape(copy(label[column.state]))
+      '<section class="board-column" data-board-state="'+column.state+'"><h3>'+escape(copy(BOARD_LABELS[column.state]))
       +' <span>'+column.cards.length+'</span></h3>'
       +(column.cards.map(card=>boardCardHTML(card,name,portrait,escape,copy)).join('')||'<p class="board-empty">·</p>')
-      +'</section>').join('')+'</div>');
+      +'</section>').join('')+'</div></div></div>');
+  const inner=changed&&offset&&panel.querySelector('.board-inner');
+  if(inner)[inner.scrollTop,inner.scrollLeft]=offset;
+  showBoardOpen();
+}
+function showBoardOpen(){
+  const panel=$('#taskBoard');
+  panel.toggleAttribute('data-open',boardOpen);
+  panel.querySelector('.board-toggle')?.setAttribute('aria-expanded',String(boardOpen));
+  $('#boardBody')?.toggleAttribute('inert',!boardOpen);
 }
 
 function renderRoomFeed(room) {
@@ -2025,6 +2042,12 @@ $('#roomMembersToggle').addEventListener('click',()=>{
   detail();
 });
 $('#taskBoard').addEventListener('click',event=>{
+  if(event.target.closest('.board-toggle')){
+    boardOpen=!boardOpen;
+    save('ui.boardOpen.v1',boardOpen);
+    showBoardOpen();
+    return;
+  }
   const address=event.target.closest('[data-board-owner]')?.dataset.boardOwner;
   const term=address&&boardOwnerTerm(address);
   if(term)openDirectChat(term);

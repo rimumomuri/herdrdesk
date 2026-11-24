@@ -64,3 +64,11 @@ export function boardCardHTML(card, nameOf, portraitOf, escape, copy) {
     + '<span class="board-card-age">' + escape(age(card.ageMs)) + '</span>'
     + '</span></button>';
 }
+
+export const BOARD_LABELS = { queued: 'boardQueued', working: 'boardWorking', review: 'boardReview', blocked: 'boardBlocked', done: 'boardDone' };
+
+/** One line of counts per column, shown while the board is folded away. */
+export function boardSummaryHTML(columns, copy) {
+  return columns.map(column => '<span class="board-chip" data-board-state="' + column.state + '"' + (column.cards.length ? '' : ' data-empty="true"') + '>'
+    + copy(BOARD_LABELS[column.state]) + ' <b>' + column.cards.length + '</b></span>').join('');
+}
