@@ -2317,7 +2317,7 @@ window.desk={
     if(!target)return;
     page='conversations';
     const room=rooms().find(item=>roomLead(item)?.address===target.address);
-    if(room)openRoom(room.id); else openDirectChat(target);
+    if(room)openRoom(room.id); else{openDirectChat(target);render();}
   },
   companionOff(){
     companionSettings.enabled=false;
