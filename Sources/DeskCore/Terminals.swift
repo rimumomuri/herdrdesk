@@ -11,6 +11,8 @@ public struct Term: Equatable {
     public var app: String?
     public var status: String?
     public var statusMessage: String?
+    /// OSC 7501 `kind` of a blocked report: permission, question or auth (the program's own word, capped).
+    public var statusKind: String?
     public var cols: Int?
     public var rows: Int?
     public var turn: Int
@@ -37,6 +39,7 @@ public struct Term: Equatable {
         if let s = json["status"] as? [String: Any] {
             app = s["app"] as? String; status = s["state"] as? String
             statusMessage = (s["msg"] as? String).map { String($0.prefix(500)) }
+            statusKind = (s["kind"] as? String).map { String($0.prefix(24)) }
         } else {
             app = json["agent"] as? String; status = json["status"] as? String
         }
@@ -68,7 +71,7 @@ public struct Term: Equatable {
                 || k.hasPrefix("flow.") || k.hasPrefix("flowack.") || k.hasPrefix("result.")
         }
         return ["address": address, "name": name ?? NSNull(), "parent": parent ?? NSNull(), "state": state, "agent": app ?? NSNull(), "status": status ?? "unknown",
-                "turn": turn, "session": session, "statusMessage": statusMessage ?? "", "labels": keep,
+                "turn": turn, "session": session, "statusMessage": statusMessage ?? "", "statusKind": statusKind ?? "", "labels": keep,
                 "program": ["agent": isAgent], "statusMs": statusMs.map { NSNumber(value: $0) } ?? NSNull(),
                 "seenMs": NSNumber(value: seenMs), "createdMs": NSNumber(value: createdMs), "modelOptions": options]
     }
