@@ -40,6 +40,18 @@ public enum CompanionLayout {
         let lines = (body["lines"] as? [Any] ?? []).compactMap { $0 as? String }.prefix(4).map { String($0.prefix(120)) }
         let flashAt = flash == nil ? nil : body["flashAt"] as? Double
         return ["mood": mood, "count": number("count"), "working": number("working"), "flash": flash ?? NSNull(),
-                "flashAt": flashAt ?? NSNull(), "lines": Array(lines)]
+                "flashAt": flashAt ?? NSNull(), "lines": Array(lines), "face": face(body["face"]) ?? NSNull()]
+    }
+
+    /// The agent's look: a known provider and short lowercase style names (the page maps unknown names to defaults).
+    static func face(_ value: Any?) -> [String: Any]? {
+        guard let body = value as? [String: Any], let provider = body["provider"] as? String, ["codex", "claude", "neutral"].contains(provider) else { return nil }
+        var face: [String: Any] = ["provider": provider, "sleeping": body["sleeping"] as? Bool ?? false, "working": body["working"] as? Bool ?? false]
+        for key in ["style", "coat", "accessory"] {
+            let name = body[key] as? String ?? ""
+            guard name.count <= 24, name.allSatisfy({ ("a"..."z").contains($0) || ("0"..."9").contains($0) || $0 == "-" }) else { return nil }
+            face[key] = name
+        }
+        return face
     }
 }

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {companionState, companionSummary, FLASH_MS} from '../Resources/web/companion.js';
+import {companionState, companionSummary, featuredAgent, FLASH_MS} from '../Resources/web/companion.js';
 
 const now = 1_000_000;
 const base = {connection:'live', attention:[], working:0, flash:null, now};
@@ -47,4 +47,13 @@ test('the hover line names teams and counts only, never question text', () => {
 test('each flash carries its event time, so a second finish of the same kind is still new', () => {
   assert.equal(companionState({...base, flash:{kind:'handoff', at:now - 2000}}).flashAt, now - 2000);
   assert.equal(companionState({...base, flash:{kind:'handoff', at:now - FLASH_MS - 1}}).flashAt, null);
+});
+
+test('the face shown is whoever needs you, else who just finished, else the latest to start working, else the last face', () => {
+  const working = ['w-new', 'w-old'];
+  assert.equal(featuredAgent({mood:'attention', flash:'done', targetKey:'a', finishedKey:'f', workingKeys:working, previousKey:'p'}), 'a');
+  assert.equal(featuredAgent({mood:'working', flash:'done', finishedKey:'f', workingKeys:working, previousKey:'p'}), 'f');
+  assert.equal(featuredAgent({mood:'working', flash:'handoff', finishedKey:'f', workingKeys:working, previousKey:'p'}), 'w-new');
+  assert.equal(featuredAgent({mood:'idle', workingKeys:[], previousKey:'p'}), 'p');
+  assert.equal(featuredAgent({mood:'idle', workingKeys:[]}), null);
 });

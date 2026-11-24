@@ -34,3 +34,10 @@ export function companionSummary(state, copy) {
   lines.push(state.mood === 'working' ? fill('companionWorking', { n: state.working }) : copy('companionIdle'));
   return lines;
 }
+
+/** Whose face the companion wears: who needs you, else who just finished, else the latest to start working, else the last face. */
+export function featuredAgent({ mood, flash = null, targetKey = null, finishedKey = null, workingKeys = [], previousKey = null }) {
+  if (mood === 'attention' && targetKey) return targetKey;
+  if (flash === 'done' && finishedKey) return finishedKey;
+  return workingKeys[0] || previousKey || null;
+}
