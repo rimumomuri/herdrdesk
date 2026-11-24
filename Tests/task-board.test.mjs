@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { boardColumns, teamCounts, boardCardHTML, teamCountsText } from '../Resources/web/task-board.js';
+import { boardColumns, teamCounts, boardCardHTML, teamCountsText, boardSummaryHTML } from '../Resources/web/task-board.js';
 
 const now = Date.parse('2026-11-20T12:00:00Z');
 const iso = ms => new Date(ms).toISOString();
@@ -85,4 +85,14 @@ test('a card shows its number and what it waits for, without emoji', () => {
   assert.match(locked, /data-waiting="true"/);
   assert.match(locked, /<span class="board-card-waiting"><svg[^>]*aria-hidden="true"[\s\S]*<\/svg>&lt;x> 끝나야 시작<\/span>/);
   assert.doesNotMatch(numbered + locked, /[①-⓿\u{1F300}-\u{1FAFF}]/u);
+});
+
+test('the collapsed board shows one line of per-column counts, each column labelled and coloured by state', () => {
+  const copy = key => ({boardQueued:'대기', boardWorking:'진행', boardReview:'검토', boardBlocked:'막힘', boardDone:'완료'})[key] || key;
+  const columns = [{state:'queued', cards:[{}, {}]}, {state:'working', cards:[{}]}, {state:'review', cards:[]}, {state:'blocked', cards:[{}]}, {state:'done', cards:[]}];
+  const html = boardSummaryHTML(columns, copy);
+  assert.equal((html.match(/class="board-chip"/g) || []).length, 5);
+  assert.match(html, /<span class="board-chip" data-board-state="queued">대기 <b>2<\/b><\/span>/);
+  assert.match(html, /data-board-state="blocked">막힘 <b>1<\/b>/);
+  assert.match(html, /data-board-state="review" data-empty="true">검토 <b>0<\/b>/);
 });

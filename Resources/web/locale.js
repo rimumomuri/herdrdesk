@@ -92,7 +92,7 @@ const strings = {
  cardAssign:['Handed over','일 전달','引き継ぎ'],cardReply:['Result back','결과 회신','結果の返信'],cardProgress:['Update','중간 보고','途中報告'],cardMessage:['Message','메시지','メッセージ'],
  boardQueued:['Queued','대기','待機'],boardWorking:['Working','진행','進行'],boardReview:['Review','검토','確認'],boardBlocked:['Blocked','막힘','停止'],boardDone:['Done','완료','完了'],
  boardEmpty:['No cards yet','아직 카드가 없어요','まだカードがありません'],teamCountWorking:['Working {n}','진행 {n}','進行 {n}'],boardPriority:['Priority {n}','우선순위 {n}','優先度 {n}'],toBottom:['Jump to latest','맨 아래로','最新へ'],newMessagesBelow:['New messages','새 메시지','新しいメッセージ'],boardWaitingOn:['Starts after {title}','{title} 끝나야 시작','{title} の完了後に開始'],teamCountBlocked:['Blocked {n}','막힘 {n}','停止 {n}'],
- boardWarning:['Part of the card ledger could not be read','원장 일부를 읽지 못했어요','台帳の一部を読めませんでした'],boardTitle:['Card board','작업 보드','作業ボード'],
+ boardWarning:['Part of the card ledger could not be read','원장 일부를 읽지 못했어요','台帳の一部を読めませんでした'],boardTitle:['Card board','작업 보드','作業ボード'],boardExpand:['Show cards','펼치기','開く'],boardCollapse:['Hide cards','접기','閉じる'],
  waitingOnOthers:['Waiting on others','기다리는 중','他の担当を待機中'],
  unassignedChats:['Unassigned','할당되지 않음','未分類'],addSection:['New section','새 섹션','新しいセクション'],renameSection:['Rename section','섹션 이름 바꾸기','セクション名を変更'],deleteSection:['Delete section','섹션 삭제','セクションを削除'],
  handoffSaveFailed:['Could not save the handoff record. It stays on screen for now.','위임 기록을 저장하지 못했어요. 지금 화면에는 유지됩니다.','引き継ぎ記録を保存できませんでした。画面には表示したままです。'],
