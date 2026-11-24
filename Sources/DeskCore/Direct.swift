@@ -10,19 +10,24 @@ public final class DirectSender {
 
     public static func defaultDir() -> URL { DeskPaths.data.appendingPathComponent("direct", isDirectory: true) }
 
+    /// The part of a message that names images already placed beside the target (empty without images).
+    public static func imageNote(_ images: [(path: String, a: Attachment)]) -> String {
+        guard !images.isEmpty else { return "" }
+        // Honest wording (research hq-desk-image-attach): a file PATH, not an inline multimodal attachment.
+        var out = "\n\n[사용자 첨부 이미지 · 파일 경로 전달(직접 첨부 아님)]"
+        for i in images {
+            let fmt = i.path.lowercased().hasSuffix(".jpg") ? "JPEG" : "PNG"
+            out += "\n- \(i.path) (\(fmt), \(i.a.width)×\(i.a.height), \(max(1, i.a.bytes / 1024))KB)"
+        }
+        out += "\n이미지를 직접 열어 확인해 주세요(Claude Code: Read 도구, Codex: view_image). 열 수 없으면 '이미지 열람 실패'라고 알려 주세요."
+        return out
+    }
+
     public static func message(_ text: String, images: [(path: String, a: Attachment)] = []) -> String {
         var out = "[User message · HerdrDesk]"
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if !t.isEmpty { out += "\n\(t)" }
-        if !images.isEmpty {
-            // Honest wording (research hq-desk-image-attach): a file PATH, not an inline multimodal attachment.
-            out += "\n\n[사용자 첨부 이미지 · 파일 경로 전달(직접 첨부 아님)]"
-            for i in images {
-                let fmt = i.path.lowercased().hasSuffix(".jpg") ? "JPEG" : "PNG"
-                out += "\n- \(i.path) (\(fmt), \(i.a.width)×\(i.a.height), \(max(1, i.a.bytes / 1024))KB)"
-            }
-            out += "\n이미지를 직접 열어 확인해 주세요(Claude Code: Read 도구, Codex: view_image). 열 수 없으면 '이미지 열람 실패'라고 알려 주세요."
-        }
+        out += imageNote(images)
         return out
     }
 

@@ -14,7 +14,7 @@ import { companionState, companionSummary, featuredAgent } from './companion.js'
 import { agentTrouble, machineTrouble } from './trouble.js';
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest, mainMachineLabel } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText, boardSummaryHTML, BOARD_LABELS } from './task-board.js';
-import { questionFormHTML, keepTyping } from './chat-questions.js';
+import { questionFormHTML, questionFilesHTML, keepTyping } from './chat-questions.js';
 import { sendBlocked, deferredSaver } from './composer.js';
 import { freshEntries } from './motion.js';
 import { stickyScroll } from './chat-scroll.js';
@@ -912,12 +912,29 @@ function showQuestions() {
   panel.innerHTML=list.map(questionHTML).join('');
 }
 
+// The agent that asked: its attachment tray (the one its conversation's composer uses) goes out with the answer.
+const askerOf=q=>inventory.find(term=>term.address===q.address&&term.state==='live')||null;
+const askerFor=form=>{const q=questions().find(item=>item.id===form?.dataset.question);return q?askerOf(q):null;};
 function questionHTML(q) {
   const approvalTerm=inventory.find(term=>term.address===q.approval?.address);
-  return questionFormHTML(q,{label:inventory.find(term=>term.address===q.address)?.label||q.address,
+  const asker=askerOf(q);
+  if(asker)fetchAttachments(asker);
+  return questionFormHTML(q,{label:asker?.label||inventory.find(term=>term.address===q.address)?.label||q.address,
     canAnswer:q.answerable&&snapshot.connection==='live'&&!questionSending.has(q.id),
     feedback:questionResults.get(q.id)||q.state, draft:questionDrafts.get(q.id)||'',
-    approvalLabel:approvalTerm?.label, live:snapshot.connection==='live'},copy,escape);
+    approvalLabel:approvalTerm?.label, live:snapshot.connection==='live',
+    files:asker?filesFor(asker):[], filesKey:asker?sessionKey(asker):'', attachBusy:asker?pendingFiles(sessionKey(asker))>0:true},copy,escape);
+}
+/** Question cards are not rebuilt while someone types in them, so their image lists are patched in place. */
+function refreshQuestionFiles(){
+  for(const box of document.querySelectorAll('[data-question-files]')){
+    const term=inventory.find(item=>sessionKey(item)===box.dataset.questionFiles);
+    const busy=!term||pendingFiles(box.dataset.questionFiles)>0;
+    const html=questionFilesHTML(term?filesFor(term):[],busy,copy,escape);
+    if(box.innerHTML!==html)box.innerHTML=html;
+    const button=box.closest('[data-question]')?.querySelector('[data-question-attach]');
+    if(button)button.disabled=busy;
+  }
 }
 
 const participant = term => ({key:sessionKey(term),label:term.label,machine:machineFor(term),address:term.address});
@@ -1132,8 +1149,8 @@ function renderAttachments(term){
     +copy('removeAttachment')+' · '+escape(file.name)+'"'+(disabled||count?' disabled':'')+'>×</button></span>').join('');
 }
 
-async function addAttachments(list){
-  const term=active(), key=sessionKey(term);
+async function addAttachments(list,term=active()){
+  const key=sessionKey(term);
   if(!sendable(term,snapshot.connection)||pendingFiles(key)||viewed().some(entry=>entry.state==='sending'))return;
   const available=4-filesFor(term).length;
   const inputs=Array.from(list);
@@ -1623,6 +1640,7 @@ function transferredImages(transfer){
   return (files.length?files:Array.from(transfer?.items||[]).map(item=>item.getAsFile()).filter(Boolean)).filter(isImageFile);
 }
 chatSurface.addEventListener('paste',event=>{
+  if(event.target.closest?.('[data-question]'))return;   // a question card takes its own images
   const files=transferredImages(event.clipboardData);
   if(files.length){event.preventDefault();addAttachments(files);}
 });
@@ -2225,6 +2243,23 @@ panel.addEventListener('click',event=>{
     field.focus();
   }
   if(target.hasAttribute('data-approval'))checkApprovalTarget(form.dataset.question);
+  if(target.hasAttribute('data-question-attach'))form.querySelector('[data-question-file]')?.click();
+  const remove=target.dataset.questionRemove, asker=askerFor(form);
+  if(remove&&asker)post({type:'detach',address:asker.address,session:asker.session,id:remove});
+});
+panel.addEventListener('change',event=>{
+  if(!event.target.matches('[data-question-file]'))return;
+  const asker=askerFor(event.target.closest('[data-question]'));
+  const files=Array.from(event.target.files||[]).filter(isImageFile);
+  if(asker&&files.length)addAttachments(files,asker).then(refreshQuestionFiles);
+  event.target.value='';
+});
+panel.addEventListener('paste',event=>{
+  const form=event.target.closest?.('[data-question]'), files=transferredImages(event.clipboardData);
+  if(!form||!files.length)return;
+  event.preventDefault();
+  const asker=askerFor(form);
+  if(asker)addAttachments(files,asker).then(refreshQuestionFiles);
 });
 // Enter sends the answer like the composer (Shift+Enter: new line; never while an input method is composing).
 let answerComposing=false, answerComposed=-Infinity;
@@ -2239,10 +2274,12 @@ panel.addEventListener('keydown',event=>{
 });
 panel.addEventListener('submit',event=>{
   event.preventDefault();
-  const form=event.target,id=form.dataset.question,text=form.elements.answer?.value.trim();
-  if(!text||questionSending.has(id))return;
+  const form=event.target,id=form.dataset.question,text=form.elements.answer?.value.trim()||'';
+  const asker=askerFor(form), key=asker?sessionKey(asker):'';
+  const attachments=asker?filesFor(asker).map(file=>file.id):[];
+  if((!text&&!attachments.length)||questionSending.has(id)||(key&&pendingFiles(key)))return;
   questionSending.add(id);
-  post({type:'answer',id,text});
+  post({type:'answer',id,text,attachments});
   showQuestions();
   detail();
 });
@@ -2469,6 +2506,7 @@ window.desk={
     if(result.error)attachmentNotices.set(key,result.error);
     else attachmentNotices.delete(key);
     if(sessionKey(active())===key)updateComposer();
+    refreshQuestionFiles();
   },
   compatibilitySummary(probe){
     if(probe){

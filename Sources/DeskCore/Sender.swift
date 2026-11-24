@@ -99,8 +99,12 @@ public final class AnswerSender {
         return .needsCheck(r.err.isEmpty ? "hc 응답을 해석하지 못했어요." : String(r.err.prefix(200)))
     }
 
-    public func send(role: String, questionId: String, text: String) -> SendOutcome {
-        if let r = checkText(text) { return .refused(r) }
+    /// `attachments`: images placed beside the asker with `hc put` before the answer; any failure sends nothing.
+    /// With images the text may be empty.
+    public func send(role: String, questionId: String, text: String, attachments: [Attachment] = []) -> SendOutcome {
+        if attachments.isEmpty, let r = checkText(text) { return .refused(r) }
+        if !attachments.isEmpty, text.count > maxAnswerLength || text.unicodeScalars.contains(where: { $0.value == 0 }) { return .refused(.badText) }
+        if attachments.count > AttachmentStore.maxCount { return .refused(.badText) }
         guard let lock = FileLock.tryAcquire(path: lockPath) else { return .refused(.lockHeld) }
         defer { lock.release() }
         if !ledger.allowsSend(questionId) { return .refused(.alreadyHandled(ledger.read(questionId)?.state ?? "?")) }
@@ -114,7 +118,32 @@ public final class AnswerSender {
         do { try ledger.write(questionId, entry) } catch { return .refused(.ledgerError("\(error.localizedDescription)")) }
         _ = hc.run(["label", term.address, "ask.state=sending"], timeout: 15)   // informational only
 
-        var payload = outgoingMessage(questionId: questionId, text: text)
+        var landed: [(path: String, a: Attachment)] = []
+        for a in attachments {
+            let r = hc.run(["put", "--json", term.address, a.file], timeout: 60)
+            let obj = r.out.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            guard !r.timedOut, r.code == 0, let path = obj?["path"] as? String, path.hasPrefix("/") else {
+                entry.state = "not_sent"; entry.note = "image put failed: \(a.name)"; entry.at = iso()
+                try? ledger.write(questionId, entry)
+                _ = hc.run(["label", term.address, "ask.state=open"], timeout: 15)
+                return .notSent("이미지 '\(a.name)'을 전달하지 못해 답변을 보내지 않았어요")
+            }
+            landed.append((path, a))
+        }
+        if !landed.isEmpty {
+            // the asker must still be the same open question after the copies
+            // (its ask.state now reads "sending", set above, so the full open-question check no longer applies)
+            guard case .success(let current) = fetchRole(role), current.address == term.address, current.session == term.session,
+                  Question(labels: current.labels)?.id == questionId, !["blocked", "error"].contains(current.status ?? "") else {
+                entry.state = "not_sent"; entry.note = "question changed during image transfer"; entry.at = iso()
+                try? ledger.write(questionId, entry)
+                _ = hc.run(["label", term.address, "ask.state=open"], timeout: 15)
+                return .notSent("The question changed before delivery.")
+            }
+            entry.note = "images: " + landed.map { $0.path }.joined(separator: ", ")
+            try? ledger.write(questionId, entry)
+        }
+        var payload = outgoingMessage(questionId: questionId, text: text) + DirectSender.imageNote(landed)
         if let lineage, let question = Question(labels:term.labels) {
             var bound = LineageIdentity(term)
             var verified = true
