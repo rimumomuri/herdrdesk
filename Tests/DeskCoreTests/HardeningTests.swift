@@ -77,6 +77,20 @@ final class HardeningTests: XCTestCase {
         XCTAssertEqual(updated.terms["t1"]?.turn,7)
     }
 
+    func testMissedResyncReplacesTheTable() {
+        let store = liveStore()
+        let change = store.apply(line:#"{"jsonrpc":"2.0","method":"missed","params":{"seq":57,"terminals":[{"address":"t5","state":"live","created_ms":1,"pid":5}]}}"#)
+        XCTAssertEqual(change, .snapshot)
+        XCTAssertEqual(Set(store.terms.keys), ["t5"])
+    }
+
+    func testEventsOtherThanTitleAskForARead() {
+        let store = liveStore()
+        XCTAssertEqual(store.apply(line:#"{"method":"event","params":{"seq":5,"type":"status","terminal":"t1","data":{"status":{"state":"done"}}}}"#), .refresh("t1"))
+        XCTAssertEqual(store.apply(line:#"{"method":"event","params":{"seq":6,"type":"title","terminal":"t1","data":{"title":"x"}}}"#), StoreChange.none)
+        XCTAssertEqual(store.apply(line:#"{"method":"missed","params":{"seq":7}}"#), StoreChange.none, "a missed without a snapshot changes nothing")
+    }
+
     func testPageSeesWhichTerminalsAreSpawnedWorkersButNotOtherTaskLabels() {
         let store = TerminalStore()
         store.replace(address:"t9",with:["address":"t9","state":"live","created_ms":1,"pid":2,

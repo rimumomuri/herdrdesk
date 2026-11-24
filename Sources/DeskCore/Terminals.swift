@@ -79,8 +79,9 @@ public struct Term: Equatable {
 
 public enum StoreChange: Equatable { case none, snapshot, refresh(String) }
 
-/// Live terminal table fed by `hc events --json`: first line is a snapshot, then events.
-/// Title events (~30/s) are dropped; any other event on a terminal asks for one re-read of it.
+/// Live terminal table fed by `hc events --json`: first line is a snapshot, then events. A `missed` message (the
+/// subscriber fell behind) carries a fresh snapshot and replaces the table. Title events (~30/s) are dropped; any other
+/// event on a terminal asks for one re-read of it (events lack `status_ms` and model details, which a read has).
 public final class TerminalStore {
     public private(set) var terms: [String: Term] = [:]
     public init() {}
@@ -89,7 +90,8 @@ public final class TerminalStore {
     public func apply(line: String, nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) -> StoreChange {
         guard let data = line.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return .none }
-        if let list = obj["terminals"] as? [[String: Any]] {
+        let resync = (obj["method"] as? String) == "missed" ? (obj["params"] as? [String: Any])?["terminals"] : nil
+        if let list = (obj["terminals"] ?? resync) as? [[String: Any]] {
             var next: [String: Term] = [:]
             for j in list { if var t = Term(json: j), t.state == "live" { t.seenMs = nowMs; next[t.address] = t } }
             terms = next
