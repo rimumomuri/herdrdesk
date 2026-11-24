@@ -14,6 +14,7 @@ import { boardColumns, teamCounts, boardCardHTML, teamCountsText } from './task-
 import { questionFormHTML, keepTyping } from './chat-questions.js';
 import { sendBlocked, deferredSaver } from './composer.js';
 import { freshEntries } from './motion.js';
+import { stickyScroll } from './chat-scroll.js';
 import { makeInventory, makeTeamDirectory, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
 import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
 import { enterAction } from './keys.js';
@@ -170,6 +171,18 @@ let pendingActivityTimer;
 const motionPreference=matchMedia("(prefers-reduced-motion: reduce)");
 // Short entrance motion for new messages, question cards and switched conversations. Off with Reduce Motion.
 const seenEntries=new Map();
+// Chats follow the newest message until the person scrolls up; then a "to the bottom" button appears.
+const DOWN='<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 2v7M2.5 6 6 9.5 9.5 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function showToBottom(selector,{stuck,unseen}){
+  const button=$(selector);
+  button.hidden=stuck;
+  button.dataset.unseen=String(unseen);
+  button.innerHTML=DOWN+'<span>'+escape(copy(unseen?'newMessagesBelow':'toBottom'))+'</span>';
+}
+const chatScroll=stickyScroll($('#chatHistory'),{onState:state=>showToBottom('#chatToBottom',state)});
+const feedScroll=stickyScroll($('#roomFeed'),{onState:state=>showToBottom('#feedToBottom',state)});
+$('#chatToBottom').addEventListener('click',()=>chatScroll.toBottom());
+$('#feedToBottom').addEventListener('click',()=>feedScroll.toBottom());
 const RISE=[{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}];
 const POP=[{opacity:0,transform:'scale(.97)'},{opacity:1,transform:'none'}];
 const FADE=[{opacity:.2},{opacity:1}];
@@ -713,7 +726,6 @@ function renderRoomFeed(room) {
   const visible=roomFeedRows(room).slice(-150);
   const panel=$('#roomFeed');
   const sameRoom=timelineRoom===room.id;
-  const follow=!sameRoom || panel.scrollHeight-panel.scrollTop-panel.clientHeight<48;
   if(!sameRoom){timelineIds.clear();routePulses.clear();}
   const html=visible.map(row=>{
     if(row.kind==='progress')return progressDisclosure(row,'room:'+room.id+':'+row.id);
@@ -729,6 +741,7 @@ function renderRoomFeed(room) {
       +'<header><span class="feed-author">'+tagHTML(messageTag(row.kind),copy,escape)+icon+heading+'</span><small>'+(messageTag(row.kind)?'':escape(copy(row.kind))+' · ')+time(row.at)
       +'</small></header>'+renderChatText(row.body)+messageImages(row)+lineageMarkup(snapshot.lineage,'room:'+room.id,row.id,inventory,snapshot.ledger||{},copy)+'</article>';
   }).join('') || '<p class="muted">'+copy('teamFeedEmpty')+'</p>';
+  const addedRows=sameRoom&&visible.some(row=>!timelineIds.has(row.id));
   const updated=setPanel('#roomFeed',html);
   if(updated)enterFresh(panel,'room:'+room.id,'data-feed',RISE,180);
   if(!sameRoom&&timelineRoom)enter([panel],FADE,140);
@@ -753,7 +766,8 @@ function renderRoomFeed(room) {
   timelineIds.clear();
   for(const row of visible)timelineIds.add(row.id);
   timelineRoom=room.id;
-  if(follow)panel.scrollTop=panel.scrollHeight;
+  if(!sameRoom)feedScroll.toBottom();
+  else if(updated)feedScroll.contentChanged(addedRows);
 }
 
 function recordHandoffs() {
@@ -1141,6 +1155,8 @@ function updateComposer() {
   if (content !== log.dataset.signature || log.dataset.target !== key) {
     const switched = log.dataset.target!==key;
     const follow = transcript.scrollHeight-transcript.scrollTop-transcript.clientHeight<48 || switched;
+    const added = !switched && entries.length > Number(log.dataset.count || 0);
+    log.dataset.count = String(entries.length);
     log.innerHTML = content;
     enterFresh(log,'chat:'+key,'data-record-id',RISE,180);
     if(switched&&log.dataset.target)enter([log],FADE,140);
@@ -1148,7 +1164,8 @@ function updateComposer() {
     observeChatImages();
     log.dataset.signature = content;
     log.dataset.target = key;
-    if(follow)transcript.scrollTop=transcript.scrollHeight;
+    if(showConversation){ if(switched)chatScroll.toBottom(); else chatScroll.contentChanged(added); }
+    else if(follow)transcript.scrollTop=transcript.scrollHeight;
   }
 }
 
@@ -1321,7 +1338,8 @@ function renderChatContext(term,room) {
   }
   roomCurrentKey=currentKey;
   previousInlineHandoff=latest?.id||'';
-  if(follow)transcript.scrollTop=transcript.scrollHeight;
+  if(page==='conversations')chatScroll.contentChanged(false);
+  else if(follow)transcript.scrollTop=transcript.scrollHeight;
 }
 
 function detail() {
@@ -1386,11 +1404,11 @@ function detail() {
     const history=$('#chatHistory');
     if(history.dataset.displayedTarget!==key){
       history.dataset.displayedTarget=key;
-      history.scrollTop=history.scrollHeight;
+      chatScroll.toBottom();
     }
   }
   renderRoomFeed(room);
-  if(openingFeed)feed.scrollTop=feed.scrollHeight;
+  if(openingFeed)feedScroll.toBottom();
   if (showTerminal && !document.hidden) terminalView.sync(inspected,snapshot.connection==='live');
   else terminalView.stop();
 }
@@ -1568,6 +1586,7 @@ $('#composer').addEventListener('submit',event=>{
   const record={id,conversationId,teamRoom:currentRoom()?.id,target:sessionKey(term),address:term.address,session:term.session,label:term.label,role:legacyDraftKey(term),text,draft:value,images:selectedFiles.length,at:Date.now(),state:'sending'};
   deliveries.push(record);
   save(deliveriesKey,chatImageHistory(deliveries.slice(-200)));
+  if(currentRoom())feedScroll.toBottom(); else chatScroll.toBottom();   // sending always brings the newest message into view
   updateComposer();
   post({type:'send',id,conversationId,address:term.address,session:term.session,text,attachments:selectedFiles});
 });
