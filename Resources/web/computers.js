@@ -10,10 +10,12 @@ export function computerRows(profiles = [], liveMachines = [], terms = []) {
     : [{ name: 'local', ready: true, tier: 'heavy', slots: 0 }, ...liveMachines.map(machine => ({ name: machine.name, ready: true, tier: 'heavy', slots: 0 }))];
   const rows = listed.map(profile => {
     const connected = profile.name === 'local' || live.get(profile.name) === 'connected';
-    const used = terms.filter(term => term.state === 'live' && term.labels?.['task.spawned'] === '1'
-      && (term.machine || 'local') === profile.name).length;
+    // card workers on this computer: `used` are running now; `parked` finished but still hold a seat until retired
+    const seated = terms.filter(term => term.state === 'live' && term.labels?.['task.spawned'] === '1'
+      && (term.machine || 'local') === profile.name);
+    const used = seated.filter(term => term.status === 'working').length;
     return { name: profile.name, label: profile.label || profile.name, tier: profile.tier || 'heavy', slots: profile.slots || 0,
-             used, ready: !!profile.ready, connected, editable, main: profile.name === 'local',
+             used, parked: seated.length - used, ready: !!profile.ready, connected, editable, main: profile.name === 'local',
              projects: profile.projects === '*' ? '*' : (profile.projects || {}), rolesOff: profile.rolesOff || {}, repos: profile.repos || {},
              state: !connected ? 'offline' : profile.ready ? 'ready' : 'not-ready' };
   });
@@ -36,6 +38,7 @@ export function computerStripHTML(rows, copy, escape) {
       + '<i class="computer-dot" aria-hidden="true"></i><b>' + escape(row.label) + '</b>'
       + '<span class="computer-role"' + (row.main ? ' data-main="true"' : '') + '>' + escape(copy(row.main ? 'computerMain' : 'computerWorker')) + '</span>'
       + '<small>' + escape(copy(row.tier === 'light' ? 'tierLight' : 'tierHeavy')) + '</small>'
+      + (row.parked ? '<span class="computer-parked" title="' + escape(copy('computerParkedHint')) + '">' + escape(copy('computerParked').replace('{n}', row.parked)) + '</span>' : '')
       + '<span class="computer-load">' + (row.slots ? row.used + '/' + row.slots : row.used) + '</span></' + tag + '>';
   }).join('');
 }

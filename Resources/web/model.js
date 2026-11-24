@@ -101,6 +101,9 @@ export function explicitHandoffs(terms, now = Date.now()) {
   return handoffs;
 }
 
+/** A group appears as a team only when it is configured or has an agent: a workspace of plain shells is nobody to chat with. */
+export const listedGroup = (members, configured) => configured || members.some(term => term?.program?.agent);
+
 export function makeTeamDirectory(inventory, configuration=[]) {
   const groups = new Map(configuration.map(team => [team.id, {
     id: team.id, title: team.title, lead: team.lead, parents: team.parents || {},
@@ -166,7 +169,8 @@ export function makeTeamDirectory(inventory, configuration=[]) {
       if (parent && !ancestor) parent.children.push(node);
       else roots.push(node);
     }
-    return {id:group.id,title:group.title,roots,count:group.nodes.length};
+    const listed=listedGroup(group.nodes.map(node=>node.term),configuration.some(team=>team.id===group.id));
+    return {id:group.id,title:group.title,roots,count:listed?group.nodes.length:0};
   }).filter(group=>group.count);
 }
 

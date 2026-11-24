@@ -17,7 +17,7 @@ import { questionFormHTML, keepTyping } from './chat-questions.js';
 import { sendBlocked, deferredSaver } from './composer.js';
 import { freshEntries } from './motion.js';
 import { stickyScroll } from './chat-scroll.js';
-import { makeInventory, makeTeamDirectory, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
+import { makeInventory, makeTeamDirectory, listedGroup, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
 import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
 import { enterAction } from './keys.js';
 import { createTerminalView } from './terminal-view.js';
@@ -419,7 +419,8 @@ function rooms() {
     const role=legacyDraftKey(term);
     if(role&&!group.roles.has(role))group.roles.set(role,term.label);
   }
-  return [...groups.values()];
+  const configured=new Set(assignedTeams().map(team=>team.id));
+  return [...groups.values()].filter(group=>listedGroup(group.members,configured.has(group.id)));
 }
 
 const currentRoom=()=>page==='conversations'&&roomID ? rooms().find(room=>room.id===roomID) : null;
