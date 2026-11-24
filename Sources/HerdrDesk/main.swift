@@ -55,10 +55,10 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
             for entry in batch {
                 if entry["kind"] == "turn", let address = entry["fromAddress"], let session = entry["session"] {
                     let key = address + ":" + session
-                    if entry["state"] == "done", let previous = self.liveTurns[key],
-                       previous["turn"] != entry["turn"] { continue }
-                    self.liveTurns[key] = entry
-                    if entry["state"] == "done", let turn = entry["turn"], let at = entry["at"] {
+                    let previous = self.liveTurns[key]
+                    // the shown runtime state needs the turn's start; reply pairing keeps its earlier rule
+                    if LiveTurnRule.accepts(previous: previous, entry: entry) { self.liveTurns[key] = entry }
+                    if entry["state"] == "done", previous == nil || previous?["turn"] == entry["turn"], let turn = entry["turn"], let at = entry["at"] {
                         do { try self.liveReplyArchive.complete(turn: turn, session: session, address: address, at: at) }
                         catch { self.call("window.desk.notice(message)", ["message": "답장 턴 정보 저장에 실패했습니다. 현재 기록은 유지됩니다."]) }
                     }

@@ -304,3 +304,14 @@ public final class LiveReplyArchive {
         return formatter.date(from:value)
     }
 }
+
+/// Which provider-turn records may change what the app shows as an agent's runtime state.
+public enum LiveTurnRule {
+    /// A start always counts. A finish counts only for the turn this app saw start: after a restart the reader begins at
+    /// the end of the file, and a finish of some other turn (a sub-task, an earlier turn) must not mark a working agent done.
+    public static func accepts(previous: [String: String]?, entry: [String: String]) -> Bool {
+        guard entry["state"] == "done" else { return true }
+        guard let previous, let turn = entry["turn"] else { return false }
+        return previous["turn"] == turn
+    }
+}
