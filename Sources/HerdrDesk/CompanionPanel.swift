@@ -51,6 +51,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
     private var idleSince: Date?
     private var snoozedUntil: Date?
     private var hovering = false
+    private var bubbleRight = false
     private var recheck: Timer?
     private var observers: [NSObjectProtocol] = []
 
@@ -143,16 +144,25 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
 
     private func setHover(_ on: Bool) {
         guard on != hovering else { return }
+        let sheep = NSRect(origin: sheepOrigin(), size: NSSize(width: CompanionLayout.side, height: CompanionLayout.side))
         hovering = on
-        let side = CompanionLayout.side, frame = panel.frame
-        let right = frame.maxX
-        let width = on && !((state?["lines"] as? [String])?.isEmpty ?? true) ? CompanionLayout.wide : side
-        panel.setFrame(NSRect(x: right - width, y: frame.minY, width: width, height: side), display: true)
-        if pageReady { web.callAsyncJavaScript("window.companion.hover(on)", arguments: ["on": on], in: nil, in: .page, completionHandler: nil) }
+        bubbleRight = false
+        if on && !((state?["lines"] as? [String])?.isEmpty ?? true) {
+            let open = CompanionLayout.expanded(sheep: sheep, screens: Self.screens())
+            bubbleRight = open.bubbleRight
+            panel.setFrame(open.frame, display: true)
+        } else {
+            panel.setFrame(sheep, display: true)
+        }
+        if pageReady {
+            web.callAsyncJavaScript("window.companion.hover(on, right)", arguments: ["on": on, "right": bubbleRight], in: nil, in: .page, completionHandler: nil)
+        }
     }
 
-    /// The sheep's own place: the right end of the window, whatever its width.
-    private func sheepOrigin() -> NSPoint { NSPoint(x: panel.frame.maxX - CompanionLayout.side, y: panel.frame.minY) }
+    /// The sheep's own place: the right end of the window, or its left end while the bubble opens to the right.
+    private func sheepOrigin() -> NSPoint {
+        NSPoint(x: bubbleRight ? panel.frame.minX : panel.frame.maxX - CompanionLayout.side, y: panel.frame.minY)
+    }
 
     private func savePlace() {
         keepOnScreen()
@@ -161,8 +171,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
 
     private func keepOnScreen() {
         let origin = CompanionLayout.origin(saved: sheepOrigin(), screens: Self.screens())
-        let width = panel.frame.width
-        panel.setFrameOrigin(NSPoint(x: origin.x + CompanionLayout.side - width, y: origin.y))
+        panel.setFrameOrigin(NSPoint(x: bubbleRight ? origin.x : origin.x + CompanionLayout.side - panel.frame.width, y: origin.y))
     }
 
     private func showMenu(_ event: NSEvent) {

@@ -41,5 +41,5 @@ window.companion = {
     }
     current = state;
   },
-  hover(on) { root.classList.toggle('hovered', !!on); },
+  hover(on, right) { root.classList.toggle('hovered', !!on); root.classList.toggle('bubble-right', !!(on && right)); },
 };

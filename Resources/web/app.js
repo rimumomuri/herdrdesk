@@ -103,7 +103,8 @@ function companionAttention(){
   const byAddress=new Map(inventory.filter(term=>term.state==='live').map(term=>[term.address,term]));
   const item=term=>({address:term.address,session:term.session,team:term.team||term.label||term.address});
   return [...inventory.filter(term=>term.state==='live'&&term.program?.agent&&term.status==='blocked').map(item),
-    ...questions().filter(q=>['answerNeeded','needsCheck'].includes(q.state)).map(q=>byAddress.get(q.address)).filter(Boolean).map(item)];
+    ...questions().filter(q=>['answerNeeded','needsCheck'].includes(q.state))   // an approval asked for another agent waits on that agent
+      .map(q=>byAddress.get(q.approval?.address||q.address)).filter(Boolean).map(item)];
 }
 function pushCompanion(){
   const state=companionState({connection:snapshot.connection,attention:companionAttention(),now:Date.now(),flash:companionFlash,

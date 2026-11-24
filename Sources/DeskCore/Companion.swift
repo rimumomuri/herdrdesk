@@ -24,6 +24,14 @@ public enum CompanionLayout {
         return CGPoint(x: main.maxX - inset - side, y: main.maxY - inset - side)
     }
 
+    /// The hovered window: sheep plus bubble, growing left, or right when the left would leave the sheep's screen.
+    public static func expanded(sheep: CGRect, screens: [CGRect]) -> (frame: CGRect, bubbleRight: Bool) {
+        let screen = screens.first { $0.intersects(sheep) } ?? screens.first ?? sheep
+        let left = CGRect(x: sheep.maxX - wide, y: sheep.minY, width: wide, height: sheep.height)
+        if left.minX >= screen.minX { return (left, false) }
+        return (CGRect(x: sheep.minX, y: sheep.minY, width: wide, height: sheep.height), true)
+    }
+
     /// What the page may draw: a known mood, small numbers, a known flash and up to four short lines. Nil for anything else.
     public static func pageState(_ body: [String: Any]) -> [String: Any]? {
         guard let mood = body["mood"] as? String, moods.contains(mood) else { return nil }

@@ -52,4 +52,14 @@ final class CompanionTests: XCTestCase {
         XCTAssertNil(CompanionLayout.pageState(["mood": "run-script"]))
         XCTAssertNil(CompanionLayout.pageState(["mood": "working", "flash": "boom"])?["flash"] as? String)
     }
+
+    func testHoverBubbleOpensLeftUnlessThatLeavesTheScreen() {
+        let screen = CGRect(x: 0, y: 0, width: 1440, height: 875)
+        let right = CompanionLayout.expanded(sheep: CGRect(x: 1300, y: 700, width: 84, height: 84), screens: [screen])
+        XCTAssertEqual(right.frame, CGRect(x: 1384 - CompanionLayout.wide, y: 700, width: CompanionLayout.wide, height: 84))
+        XCTAssertFalse(right.bubbleRight)
+        let left = CompanionLayout.expanded(sheep: CGRect(x: 30, y: 700, width: 84, height: 84), screens: [screen])
+        XCTAssertEqual(left.frame, CGRect(x: 30, y: 700, width: CompanionLayout.wide, height: 84))
+        XCTAssertTrue(left.bubbleRight)
+    }
 }
