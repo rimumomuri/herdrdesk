@@ -151,3 +151,17 @@ test('the count is workers actually running; finished workers still holding a se
   const idle = computerStripHTML([{...m6, used:0, parked:0}], key => key, text => String(text));
   assert.doesNotMatch(idle, /computer-parked/);
 });
+
+test('running is decided by the caller, so a fresh provider turn overrides a stale core status either way', () => {
+  const terms = [
+    {address:'macbook-m6/t5', machine:'macbook-m6', state:'live', status:'done', labels:{'task.spawned':'1'}},
+    {address:'macbook-m6/t6', machine:'macbook-m6', state:'live', status:'working', labels:{'task.spawned':'1'}},
+  ];
+  const effective = term => term.address === 'macbook-m6/t5';   // t5 really works, t6's working was cleared
+  const [, m6] = computerRows(profiles, [{name:'macbook-m6', state:'connected'}], terms, effective);
+  assert.deepEqual([m6.used, m6.parked], [1, 1]);
+  const [, flipped] = computerRows(profiles, [{name:'macbook-m6', state:'connected'}], terms, term => term.address === 'macbook-m6/t6');
+  assert.deepEqual([flipped.used, flipped.parked], [1, 1]);
+  const [, none] = computerRows(profiles, [{name:'macbook-m6', state:'connected'}], terms, () => false);
+  assert.deepEqual([none.used, none.parked], [0, 2]);
+});

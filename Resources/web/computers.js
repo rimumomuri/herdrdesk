@@ -3,7 +3,8 @@
 
 /** state: ready | not-ready | offline. The local Mac is always reachable. editable: the list came from machines.json.
  *  main: the Mac HerdrDesk runs on, where the leads and records live; always listed first. */
-export function computerRows(profiles = [], liveMachines = [], terms = []) {
+/** isWorking: the app's effective status (a fresh provider turn overrides a stale core status). */
+export function computerRows(profiles = [], liveMachines = [], terms = [], isWorking = term => term.status === 'working') {
   const live = new Map(liveMachines.map(machine => [machine.name, machine.state]));
   const editable = profiles.length > 0;
   const listed = editable ? profiles
@@ -13,7 +14,7 @@ export function computerRows(profiles = [], liveMachines = [], terms = []) {
     // card workers on this computer: `used` are running now; `parked` finished but still hold a seat until retired
     const seated = terms.filter(term => term.state === 'live' && term.labels?.['task.spawned'] === '1'
       && (term.machine || 'local') === profile.name);
-    const used = seated.filter(term => term.status === 'working').length;
+    const used = seated.filter(isWorking).length;
     return { name: profile.name, label: profile.label || profile.name, tier: profile.tier || 'heavy', slots: profile.slots || 0,
              used, parked: seated.length - used, ready: !!profile.ready, connected, editable, main: profile.name === 'local',
              projects: profile.projects === '*' ? '*' : (profile.projects || {}), rolesOff: profile.rolesOff || {}, repos: profile.repos || {},
