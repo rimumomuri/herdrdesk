@@ -43,3 +43,8 @@ test('the hover line names teams and counts only, never question text', () => {
   assert.deepEqual(companionSummary(companionState({...base, working:3, flash:{kind:'done', at:now}}), copy), ['방금 끝남', '3개 작업 중']);
   assert.deepEqual(companionSummary(companionState({...base, connection:'lost'}), copy), ['연결 끊김']);
 });
+
+test('each flash carries its event time, so a second finish of the same kind is still new', () => {
+  assert.equal(companionState({...base, flash:{kind:'handoff', at:now - 2000}}).flashAt, now - 2000);
+  assert.equal(companionState({...base, flash:{kind:'handoff', at:now - FLASH_MS - 1}}).flashAt, null);
+});

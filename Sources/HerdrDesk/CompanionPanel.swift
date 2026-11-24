@@ -104,7 +104,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
     func update(_ body: [String: Any]) {
         guard let next = CompanionLayout.pageState(body) else { return }
         let mood = next["mood"] as? String, before = state?["mood"] as? String
-        let freshFlash = (next["flash"] as? String).map { $0 != state?["flash"] as? String } ?? false
+        let freshFlash = (next["flashAt"] as? Double).map { $0 != state?["flashAt"] as? Double } ?? false
         // an idle sheep shows for the grace period after work ends, or after a fresh finish or assignment
         if mood == "idle" { if (before != nil && before != "idle") || freshFlash { idleSince = Date() } } else { idleSince = nil }
         enabled = body["enabled"] as? Bool ?? true

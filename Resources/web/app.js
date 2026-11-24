@@ -110,7 +110,7 @@ function pushCompanion(){
   const state=companionState({connection:snapshot.connection,attention:companionAttention(),now:Date.now(),flash:companionFlash,
     working:inventory.filter(term=>term.state==='live'&&term.program?.agent&&workingNow(term)).length});
   companionTarget=state.target;
-  const message={mood:state.mood,count:state.count,working:state.working,flash:state.flash,lines:companionSummary(state,copy),
+  const message={mood:state.mood,count:state.count,working:state.working,flash:state.flash,flashAt:state.flashAt,lines:companionSummary(state,copy),
     enabled:companionSettings.enabled,attentionOnly:companionSettings.attentionOnly,
     menu:{snooze:copy('companionSnooze'),off:copy('companionOff')}};
   const signature=JSON.stringify(message);

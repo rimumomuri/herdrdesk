@@ -51,6 +51,8 @@ final class CompanionTests: XCTestCase {
         XCTAssertNil(state?["menu"])
         XCTAssertNil(CompanionLayout.pageState(["mood": "run-script"]))
         XCTAssertNil(CompanionLayout.pageState(["mood": "working", "flash": "boom"])?["flash"] as? String)
+        XCTAssertEqual(CompanionLayout.pageState(["mood": "idle", "flash": "done", "flashAt": 1764000000123.0])?["flashAt"] as? Double, 1764000000123)
+        XCTAssertNil(CompanionLayout.pageState(["mood": "idle", "flash": "done", "flashAt": "soon"])?["flashAt"] as? Double)
     }
 
     func testHoverBubbleOpensLeftUnlessThatLeavesTheScreen() {

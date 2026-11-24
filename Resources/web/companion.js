@@ -20,6 +20,7 @@ export function companionState({ connection, attention = [], working = 0, flash 
   return {
     mood, count: agents.length, working, teams,
     flash: flash && now - flash.at <= FLASH_MS ? flash.kind : null,
+    flashAt: flash && now - flash.at <= FLASH_MS ? flash.at : null,
     target: agents.length ? { address: agents[0].address, session: agents[0].session } : null,
   };
 }

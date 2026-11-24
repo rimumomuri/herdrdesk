@@ -38,6 +38,8 @@ public enum CompanionLayout {
         let number = { (key: String) in min(max(body[key] as? Int ?? 0, 0), 999) }
         let flash = (body["flash"] as? String).flatMap { ["done", "handoff"].contains($0) ? $0 : nil }
         let lines = (body["lines"] as? [Any] ?? []).compactMap { $0 as? String }.prefix(4).map { String($0.prefix(120)) }
-        return ["mood": mood, "count": number("count"), "working": number("working"), "flash": flash ?? NSNull(), "lines": Array(lines)]
+        let flashAt = flash == nil ? nil : body["flashAt"] as? Double
+        return ["mood": mood, "count": number("count"), "working": number("working"), "flash": flash ?? NSNull(),
+                "flashAt": flashAt ?? NSNull(), "lines": Array(lines)]
     }
 }
