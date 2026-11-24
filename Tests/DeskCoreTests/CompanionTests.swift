@@ -76,4 +76,10 @@ final class CompanionTests: XCTestCase {
         XCTAssertNil(CompanionLayout.pageState(["mood": "working", "face": ["provider": "codex", "style": "\"><img>"]])?["face"] as? [String: Any])
         XCTAssertNil(CompanionLayout.pageState(["mood": "working"])?["face"] as? [String: Any])
     }
+
+    func testUsageLimitIsAMoodShownUnlessOnlyAttentionIsWanted() {
+        XCTAssertEqual(CompanionLayout.pageState(["mood": "limit", "limited": 2])?["limited"] as? Int, 2)
+        XCTAssertTrue(show("limit"))
+        XCTAssertFalse(show("limit", attentionOnly: true))
+    }
 }

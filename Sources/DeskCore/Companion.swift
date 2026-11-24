@@ -6,7 +6,7 @@ public enum CompanionLayout {
     public static let wide: CGFloat = 300         // while hovered: sheep plus its bubble, growing to the left
     public static let inset: CGFloat = 24
     public static let idleGrace: TimeInterval = 10
-    public static let moods: Set<String> = ["attention", "offline", "working", "idle"]
+    public static let moods: Set<String> = ["attention", "offline", "limit", "working", "idle"]
 
     /// Shown only while HerdrDesk is in the background; an idle sheep stays briefly after work ends, then leaves.
     public static func visible(mood: String, enabled: Bool, attentionOnly: Bool, appActive: Bool, snoozed: Bool, idleFor: TimeInterval?) -> Bool {
@@ -39,7 +39,7 @@ public enum CompanionLayout {
         let flash = (body["flash"] as? String).flatMap { ["done", "handoff"].contains($0) ? $0 : nil }
         let lines = (body["lines"] as? [Any] ?? []).compactMap { $0 as? String }.prefix(4).map { String($0.prefix(120)) }
         let flashAt = flash == nil ? nil : body["flashAt"] as? Double
-        return ["mood": mood, "count": number("count"), "working": number("working"), "flash": flash ?? NSNull(),
+        return ["mood": mood, "count": number("count"), "working": number("working"), "limited": number("limited"), "flash": flash ?? NSNull(),
                 "flashAt": flashAt ?? NSNull(), "lines": Array(lines), "face": face(body["face"]) ?? NSNull()]
     }
 

@@ -3,6 +3,7 @@
 const CHECK = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.5 6.2 5 8.6l4.5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const ARROW = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6h7.5M6.5 3l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const UNPLUGGED = '<svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2 2l8 8M4 7.5 2.5 9M8 4.5 9.5 3M5 3.5l3.5 3.5-1.2 1.2a2 2 0 0 1-2.8 0l-.7-.7a2 2 0 0 1 0-2.8z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+const HOURGLASS = '<svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M3 1.5h6M3 10.5h6M3.8 1.5c0 2.6 4.4 2.9 4.4 4.5S3.8 8 3.8 10.5M8.2 1.5c0 2.6-4.4 2.9-4.4 4.5s4.4 2 4.4 4.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
 const NUDGE_EVERY = 60_000;
 
 const root = document.getElementById('companion');
@@ -34,8 +35,8 @@ window.companion = {
     }
     currentFace = face ? faceKey : 'sheep';
     const badge = document.getElementById('companionBadge');
-    badge.hidden = !['attention', 'working', 'offline'].includes(state.mood);
-    badge.innerHTML = state.mood === 'offline' ? UNPLUGGED : String(state.mood === 'attention' ? state.count : state.working);
+    badge.hidden = !['attention', 'working', 'offline', 'limit'].includes(state.mood);
+    badge.innerHTML = state.mood === 'offline' ? UNPLUGGED : state.mood === 'limit' ? HOURGLASS : String(state.mood === 'attention' ? state.count : state.working);
     const flash = document.getElementById('companionFlash');
     flash.hidden = !state.flash;
     flash.dataset.kind = state.flash || '';

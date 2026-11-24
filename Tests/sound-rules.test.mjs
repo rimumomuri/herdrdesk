@@ -39,3 +39,9 @@ test('attention rings at once for something new, then every minute until it is c
   assert.equal(s.play, false);
   assert.equal(s.lastAt, 0);
 });
+
+test('an agent that needs a login keeps ringing like a blocked one; a usage limit does not', () => {
+  const login = {address:'t3', session:'3', state:'live', program:{agent:true}, status:'error', statusMessage:'Please log in again'};
+  const limit = {address:'t4', session:'4', state:'live', program:{agent:true}, status:'error', statusMessage:'usage limit reached'};
+  assert.deepEqual([...attentionKeys([login, limit], [])], ['login:t3:3']);
+});

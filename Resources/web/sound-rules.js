@@ -2,6 +2,8 @@
 // done: a member finished its turn. handoff: work was handed over. attention: someone waits for you
 // (a permission prompt or an unanswered question); it repeats every minute until it is cleared.
 
+import { agentTrouble } from './trouble.js';
+
 export const DEFAULT_SOUNDS = { done: 'Glass', handoff: 'Pop', attention: 'Ping' };
 export const ATTENTION_EVERY = 60_000;
 
@@ -14,11 +16,12 @@ export function newHandoffs(cards = [], seen = null) {
   return { fresh, seen: ids };
 }
 
-/** One key per thing waiting on you: a blocked agent session or an unanswered question. */
+/** One key per thing waiting on you: a blocked agent session, one that needs a login, or an unanswered question. */
 export function attentionKeys(terms = [], questions = []) {
   const keys = new Set();
   for (const term of terms) {
     if (term.program?.agent && term.status === 'blocked') keys.add('blocked:' + term.address + ':' + term.session);
+    else if (agentTrouble(term) === 'login') keys.add('login:' + term.address + ':' + term.session);
   }
   for (const question of questions) {
     if (['answerNeeded', 'needsCheck'].includes(question.state)) keys.add('question:' + question.id);
