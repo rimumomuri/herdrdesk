@@ -93,7 +93,8 @@ public struct HandoffCard: Codable {
 public final class HandoffBook {
     public static let mergeWindow = 120_000.0, replyWindow = 30_000.0, weakAfter = 600_000.0,
         deskIdleAfter = 600_000.0, staleAfter = 21_600_000.0, keepFor = 604_800_000.0,
-        maxCards = 1000, returnFlash = 3_000.0, snapshotCards = 300, cardBodyLimit = 300
+        maxCards = 1000, returnFlash = 3_000.0, snapshotCards = 300, cardBodyLimit = 300,
+        answerWindow = 7_200_000.0
 
     public private(set) var edges: [HandoffEdge]
     public private(set) var cards: [HandoffCard]
@@ -125,6 +126,15 @@ public final class HandoffBook {
         if m.from != .desk, let i = edges.lastIndex(where: { !$0.isOpen && $0.from.same(m.from) && $0.to.same(m.to) }),
            let ended = edges[i].closedAt, m.at >= ended - Self.mergeWindow, m.at - ended <= Self.mergeWindow {
             _ = addCard(edges[i], at: m.at, kind: "message", from: m.from, to: m.to, body: body)
+            return
+        }
+        // The first word back on something the other side handed over (and that has finished) answers it:
+        // it is not new work, so a busy receiver must not keep it "waiting" for hours.
+        if m.from != .desk, m.to != .desk,
+           let i = edges.lastIndex(where: { ($0.from.same(m.to) && $0.to.same(m.from)) || ($0.from.same(m.from) && $0.to.same(m.to)) }),
+           edges[i].from.same(m.to), !edges[i].isOpen, let ended = edges[i].closedAt, m.at - ended <= Self.answerWindow,
+           cards.last(where: { $0.id.hasPrefix("c:\(edges[i].id):") })?.from.same(m.to) ?? true {
+            _ = addCard(edges[i], at: m.at, kind: "reply", from: m.from, to: m.to, body: body)
             return
         }
         let edge = HandoffEdge(id: "h:\(m.from.address):\(m.to.address):\(Int(m.at))", from: m.from, to: m.to,
