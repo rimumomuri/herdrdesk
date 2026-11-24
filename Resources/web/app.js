@@ -1151,7 +1151,7 @@ function renderAttachments(term){
 
 async function addAttachments(list,term=active()){
   const key=sessionKey(term);
-  if(!sendable(term,snapshot.connection)||pendingFiles(key)||viewed().some(entry=>entry.state==='sending'))return;
+  if(!sendable(term,snapshot.connection)||pendingFiles(key)||deliveries.some(entry=>entry.target===key&&entry.state==='sending'))return;
   const available=4-filesFor(term).length;
   const inputs=Array.from(list);
   attachmentNotices.delete(key);
@@ -1161,11 +1161,11 @@ async function addAttachments(list,term=active()){
     if(!valid)attachmentNotices.set(key,'attachmentFailed');
     return valid;
   });
-  if(!files.length){updateComposer();return}
+  if(!files.length){updateComposer();refreshQuestionFiles();return}
   for(const file of files){
     attachmentPending.set(key,pendingFiles(key)+1);
     const reader=new FileReader();
-    const failed=()=>{attachmentPending.set(key,Math.max(0,pendingFiles(key)-1));attachmentNotices.set(key,'attachmentFailed');updateComposer()};
+    const failed=()=>{attachmentPending.set(key,Math.max(0,pendingFiles(key)-1));attachmentNotices.set(key,'attachmentFailed');updateComposer();refreshQuestionFiles()};
     reader.onload=()=>{
       const encoded=String(reader.result).split(',')[1];
       if(encoded)post({type:'attach',address:term.address,session:term.session,name:file.name,data:encoded});
