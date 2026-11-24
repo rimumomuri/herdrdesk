@@ -1,6 +1,7 @@
 .build/
 build/
 Resources/web/bundle.js
+Resources/web/companion-bundle.js
 .DS_Store
 __pycache__/
 *.xcuserstate

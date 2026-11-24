@@ -9,6 +9,8 @@ import { shortRoleTitle, nextKey, chatHidden, foldLeadChats, inRoomConversation,
 import { buildChain, handoffCardsFor, handoffCardHTML, isDelegating } from './handoff-chain.js';
 import { messageTag, awaitingResponse, tagHTML } from './message-tags.js';
 import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick } from './sound-rules.js';
+import { sheep } from './sheep.js';
+import { companionState, companionSummary } from './companion.js';
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest, mainMachineLabel } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText, boardSummaryHTML, BOARD_LABELS } from './task-board.js';
 import { questionFormHTML, keepTyping } from './chat-questions.js';
@@ -94,6 +96,33 @@ function checkAttention(){
   if(tick.play)playSystem('attention');
 }
 setInterval(checkAttention,5000);
+// The floating companion sheep: same signals as the sounds; Swift shows it only while HerdrDesk is in the background.
+let companionFlash=null, companionTarget=null, companionSignature='';
+const companionSettings={enabled:load('ui.companion.v1',true)!==false, attentionOnly:load('ui.companionAttentionOnly.v1',false)===true};
+function companionAttention(){
+  const byAddress=new Map(inventory.filter(term=>term.state==='live').map(term=>[term.address,term]));
+  const item=term=>({address:term.address,session:term.session,team:term.team||term.label||term.address});
+  return [...inventory.filter(term=>term.state==='live'&&term.program?.agent&&term.status==='blocked').map(item),
+    ...questions().filter(q=>['answerNeeded','needsCheck'].includes(q.state))   // an approval asked for another agent waits on that agent
+      .map(q=>byAddress.get(q.approval?.address||q.address)).filter(Boolean).map(item)];
+}
+function pushCompanion(){
+  const state=companionState({connection:snapshot.connection,attention:companionAttention(),now:Date.now(),flash:companionFlash,
+    working:inventory.filter(term=>term.state==='live'&&term.program?.agent&&workingNow(term)).length});
+  companionTarget=state.target;
+  const message={mood:state.mood,count:state.count,working:state.working,flash:state.flash,flashAt:state.flashAt,lines:companionSummary(state,copy),
+    enabled:companionSettings.enabled,attentionOnly:companionSettings.attentionOnly,
+    menu:{snooze:copy('companionSnooze'),off:copy('companionOff')}};
+  const signature=JSON.stringify(message);
+  if(signature===companionSignature)return;
+  companionSignature=signature;
+  post({type:'companion',state:message});
+}
+setInterval(pushCompanion,2000);
+for(const [id,key,field] of [['#companionEnabled','ui.companion.v1','enabled'],['#companionAttentionOnly','ui.companionAttentionOnly.v1','attentionOnly']]){
+  $(id).checked=companionSettings[field];
+  $(id).addEventListener('change',event=>{companionSettings[field]=event.target.checked;save(key,event.target.checked);pushCompanion();});
+}
 let soundStates=new Map();
 let snapshot = { archiveRoles: [], terms: [], machines: [], spaces: [], ledger: {}, replies: [], connection: 'connecting', isolated: false };
 let inventory = [];
@@ -388,11 +417,6 @@ const roomLead=room=>{
   return leads.length===1?leads[0]:null;
 };
 
-function sheep(motion='still', coat=0) {
-  return '<span class="sheep" data-motion="'+motion+'" data-coat="'+coat+'" aria-hidden="true"><i class="sheep-shadow"></i>'
-    +'<span class="sheep-animal"><i class="sheep-tail"></i><i class="sheep-feet"></i><i class="sheep-fleece"></i>'
-    +'<span class="sheep-head"><i class="sheep-ear"></i><i class="sheep-eye"></i><i class="sheep-cheek"></i></span></span><i class="sheep-note"></i></span>';
-}
 
 function roomSignals() {
   if(snapshot.connection!=='live')return;
@@ -2288,6 +2312,19 @@ $('#computerSheet').addEventListener('click',event=>{
   });
 });
 window.desk={
+  openCompanionTarget(){
+    const target=companionTarget&&inventory.find(term=>term.address===companionTarget.address&&term.session===companionTarget.session);
+    if(!target)return;
+    page='conversations';
+    const room=rooms().find(item=>roomLead(item)?.address===target.address);
+    if(room)openRoom(room.id); else{openDirectChat(target);render();}
+  },
+  companionOff(){
+    companionSettings.enabled=false;
+    save('ui.companion.v1',false);
+    $('#companionEnabled').checked=false;
+    pushCompanion();
+  },
   machineResult(payload){
     const done=machinePending.get(payload?.token);
     machinePending.delete(payload?.token);
@@ -2329,12 +2366,12 @@ window.desk={
       }
     }
     soundStates=nextSoundStates;
-    if(didComplete)playSystem('done');
+    if(didComplete){playSystem('done');companionFlash={kind:'done',at:Date.now()};}
     recordHandoffs();
     fillSoundPicks(payload.systemSounds||[]);
     const handoffs=newHandoffs(payload.handoffs?.cards||[],handoffSeen);
     handoffSeen=handoffs.seen;
-    if(handoffs.fresh)playSystem('handoff');
+    if(handoffs.fresh){playSystem('handoff');companionFlash={kind:'handoff',at:Date.now()};}
     checkAttention();
     if(!roomStarted && payload.connection==='live' && (inventory.length||assignedTeams().length)){
       roomStarted=true;
@@ -2358,6 +2395,7 @@ window.desk={
     roomSignals();
     scanActivity();
     render();
+    pushCompanion();
     playActivity();
   },
   chatImages(payload){imagePreviews.receive(payload);},

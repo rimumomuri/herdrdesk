@@ -29,7 +29,7 @@ fi
 cp cli/herdr-reply "$STAGE/Contents/Resources/cli/herdr-team-message"
 cp cli/herdr-reply "$STAGE/Contents/Resources/cli/herdr-progress"
 cp cli/herdr-lineage "$STAGE/Contents/Resources/cli/herdr-lineage"
-cp Resources/web/{index.html,app.css,bundle.js} "$STAGE/Contents/Resources/web/"
+cp Resources/web/{index.html,app.css,bundle.js,companion.html,companion.css,companion-bundle.js} "$STAGE/Contents/Resources/web/"
 cp Resources/web/icons/sheep-minimal-v5.png "$STAGE/Contents/Resources/web/icons/"
 cp Resources/web/vendor/{xterm.js,xterm.css,xterm-LICENSE} "$STAGE/Contents/Resources/web/vendor/"
 cp -R Resources/web/vendor/chat-icons "$STAGE/Contents/Resources/web/vendor/"
