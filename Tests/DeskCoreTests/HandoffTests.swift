@@ -145,6 +145,16 @@ final class HandoffTests: XCTestCase {
         XCTAssertEqual(loaded.edges[0].answeredAt, t0 + 3_000)
     }
 
+    func testOlderMessageArrivingLateIsNotTheAnswer() {
+        let book = HandoffBook()
+        book.record(msg(prod, lead, t0, "question"))
+        book.observe(signals(["t1":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t1":"idle"]), now: t0 + 60_000)
+        book.record(msg(lead, prod, t0 - 500_000, "something from before the question"))
+        XCTAssertNil(book.edges[0].answeredAt)
+        XCTAssertNotEqual(book.cards.last?.kind, "reply")
+    }
+
     func testLateAnswerOpensAHandoffAsBefore() {
         let book = HandoffBook()
         book.record(msg(prod, lead, t0, "question"))
