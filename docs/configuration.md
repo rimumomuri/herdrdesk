@@ -21,6 +21,10 @@ A parent indicator comes from Core's recorded terminal parent. Group membership 
 
 Change the language using the selector in the app. The selected language is stored per installation. Existing team names, paths, message content and terminal output remain in their original language. Test with a separate `HERDRDESK_DATA` directory and a separate Core session when checking send behavior.
 
+## Card order
+
+`herdr-task create` accepts `--priority N` (1 goes first) and `--after CARD_ID` (a card of the same team that must finish first; repeatable). `herdr-task order CARD_ID` changes or clears them later. The Waiting column lists cards that can start by priority, then unnumbered cards oldest first, then cards still waiting on another card, which show a lock and the title they wait for. Other columns keep the most recently changed card first.
+
 ## Questions and approvals
 
 Assign a unique `recovery.role` label to each participating coding agent. From inside the requesting Herdr terminal, run `cli/herdr-ask open --text "Which build should I use?"`. A question can carry an optional `--approval-role ROLE` that links to a separate terminal. HerdrDesk can open that terminal after validating the link and session. Actual approval is handled by Herdr. The requesting agent can mark an answered question as received with `cli/herdr-ask ack QUESTION_ID`.

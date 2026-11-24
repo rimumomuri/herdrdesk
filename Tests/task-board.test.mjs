@@ -53,3 +53,36 @@ test('counts text omits zero parts', () => {
   assert.equal(teamCountsText({ working: 3, blocked: 1, review: 0 }, copy), '진행 3 · 막힘 1');
   assert.equal(teamCountsText({ working: 0, blocked: 0, review: 4 }, copy), '');
 });
+
+test('waiting column: ready numbered cards first, then unnumbered oldest first, then cards that must wait', () => {
+  const t = { cards: [
+    card('k-1', 'queued', { owner: null, created: iso(now - 5_000) }),
+    card('k-2', 'queued', { owner: null, priority: 2 }),
+    card('k-3', 'queued', { owner: null, priority: 1, after: ['k-9'], waitingOn: ['k-9'] }),
+    card('k-4', 'queued', { owner: null, created: iso(now - 9_000) }),
+    card('k-5', 'queued', { owner: null, priority: 1 }),
+    card('k-9', 'working', { title: 'Remove secrets' }),
+  ] };
+  const queued = boardColumns(t, now)[0].cards;
+  assert.deepEqual(queued.map(c => c.id), ['k-5', 'k-2', 'k-4', 'k-1', 'k-3']);
+  assert.equal(queued[0].priority, 1);
+  assert.equal(queued[2].priority, null);
+  assert.deepEqual(queued.at(-1).waitingOn, [{ id: 'k-9', title: 'Remove secrets' }]);
+});
+
+test('other columns keep the most recently changed first', () => {
+  const t = { cards: [card('k-1', 'working', { priority: 1, updated: iso(now - 90_000) }), card('k-2', 'working', { priority: 2 })] };
+  assert.deepEqual(boardColumns(t, now)[1].cards.map(c => c.id), ['k-2', 'k-1']);
+});
+
+test('a card shows its number and what it waits for, without emoji', () => {
+  const copy = key => ({ boardWaitingOn: '{title} 끝나야 시작', boardPriority: '우선순위 {n}' })[key] || key;
+  const esc = s => String(s).replace(/</g, '&lt;');
+  const numbered = boardCardHTML({ id: 'k-5', title: 'A', owner: null, ageMs: 0, doneOf: [0, 1], blocker: null, priority: 2, waitingOn: [] }, x => x, () => '', esc, copy);
+  assert.match(numbered, /<span class="board-card-priority" aria-label="우선순위 2">2<\/span>/);
+  const locked = boardCardHTML({ id: 'k-3', title: 'B', owner: null, ageMs: 0, doneOf: [0, 1], blocker: null, priority: null,
+    waitingOn: [{ id: 'k-9', title: '<x>' }] }, x => x, () => '', esc, copy);
+  assert.match(locked, /data-waiting="true"/);
+  assert.match(locked, /<span class="board-card-waiting"><svg[^>]*aria-hidden="true"[\s\S]*<\/svg>&lt;x> 끝나야 시작<\/span>/);
+  assert.doesNotMatch(numbered + locked, /[①-⓿\u{1F300}-\u{1FAFF}]/u);
+});

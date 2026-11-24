@@ -1295,3 +1295,9 @@ details.settings[open] .settings-menu { animation:desk-pop 140ms var(--motion-ea
   button:not(:disabled):active,summary:active { transform:none }
   dialog[open],dialog[open]::backdrop,details.settings[open] .settings-menu { animation:none }
 }
+.board-card-head { display:flex; gap:6px; align-items:flex-start }
+.board-card-priority { flex:none; min-width:16px; height:16px; padding:0 4px; box-sizing:border-box; border-radius:8px; background:#3a3a42; color:var(--ink);
+  font-size:10px; font-weight:600; line-height:16px; text-align:center; margin-top:1px }
+.board-card[data-waiting=true] { opacity:.62 }
+.board-card-waiting { display:flex; gap:4px; align-items:center; font-size:10px; color:var(--warn) }
+.board-card-waiting svg { flex:none }
