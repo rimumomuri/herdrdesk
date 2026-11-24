@@ -272,6 +272,7 @@ public final class HandoffBook {
 
     private func close(_ e: inout HandoffEdge, at: Double, returned: Double?) {
         e.state = "closed"; e.closedAt = at; e.returnedAt = returned
+        if let reply = e.pendingReplyAt { e.answeredAt = reply }   // however it closes, a word back was the answer
         e.pendingReplyAt = nil; e.busyAfterReply = nil
     }
 

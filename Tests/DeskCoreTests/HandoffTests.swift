@@ -110,6 +110,19 @@ final class HandoffTests: XCTestCase {
         XCTAssertTrue(book.edges.contains { $0.isOpen && $0.from.same(lead) && $0.to.same(prod) })
     }
 
+    func testReplyClosedByFlowCountsAsTheAnswer() {
+        let book = HandoffBook()
+        book.record(msg(lead, prod, t0))
+        book.record(msg(prod, lead, t0 + 3_000, "result"))
+        var s = signals(["t2":"working"])
+        s.flows = [HandoffFlow(worker:prod, lead:lead, id:"f1", phase:"result-sent", updatedAt:t0 + 4_000)]
+        book.observe(s, now: t0 + 5_000)
+        XCTAssertEqual(book.edges[0].state, "closed")
+        book.record(msg(prod, lead, t0 + 600_000, "separate request: review my PR"))
+        XCTAssertEqual(book.cards.last?.kind, "assign")
+        XCTAssertTrue(book.edges.contains { $0.isOpen && $0.from.same(prod) })
+    }
+
     func testLateAnswerOpensAHandoffAsBefore() {
         let book = HandoffBook()
         book.record(msg(prod, lead, t0, "question"))
