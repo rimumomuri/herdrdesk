@@ -118,4 +118,13 @@ final class HardeningTests: XCTestCase {
             XCTAssertLessThan(Date().timeIntervalSince(started),3)
         }
     }
+
+    func testPageSeesTheStatusKindTheProgramReported() {
+        let blocked = Term(json: ["address": "t1", "state": "live", "status": ["app": "codex", "state": "blocked", "kind": "auth", "msg": "Sign in"]])!
+        XCTAssertEqual(blocked.publicJSON["statusKind"] as? String, "auth")
+        let plain = Term(json: ["address": "t2", "state": "live", "status": ["app": "codex", "state": "working"]])!
+        XCTAssertEqual(plain.publicJSON["statusKind"] as? String, "")
+        let odd = Term(json: ["address": "t3", "state": "live", "status": ["app": "codex", "state": "blocked", "kind": String(repeating: "x", count: 200)]])!
+        XCTAssertEqual((odd.publicJSON["statusKind"] as? String)?.count, 24)
+    }
 }

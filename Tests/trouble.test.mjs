@@ -34,3 +34,10 @@ test('a computer whose connection needs a login is a login problem', () => {
   assert.equal(machineTrouble({name:'macbook-m6', state:'connected'}), null);
   assert.equal(machineTrouble(undefined), null);
 });
+
+test('a blocked report with kind=auth is a login problem whatever its message says', () => {
+  assert.equal(agentTrouble({...agent('blocked', 'Waiting'), statusKind:'auth'}), 'login');
+  assert.equal(agentTrouble({...agent('blocked'), statusKind:'auth'}), 'login');
+  assert.equal(agentTrouble({...agent('blocked', 'Run this command?'), statusKind:'permission'}), null);
+  assert.equal(agentTrouble({...agent('working'), statusKind:'auth'}), null, 'kind only counts while blocked');
+});
