@@ -13,6 +13,8 @@ body.companion-body { display:block; min-height:0; min-width:0 }
   font-size:11px; font-weight:700; line-height:18px; text-align:center; color:#fff; background:#3d6fd6; box-shadow:0 0 0 2px #1d1d21 }
 .companion[data-mood=attention] .companion-badge { background:#e5484d }
 .companion[data-mood=offline] .companion-badge { width:18px; padding:0; display:grid; place-items:center; background:#5a5a62 }
+.companion[data-mood=limit] .companion-badge { width:18px; padding:0; display:grid; place-items:center; background:#7a5af5 }
+.companion[data-mood=limit] .companion-figure { box-shadow:0 4px 14px #0008, 0 0 0 2px #b49cff88 }
 .companion[data-mood=attention] .companion-figure { box-shadow:0 4px 14px #0008, 0 0 0 2px #e5484daa }
 .companion[data-mood=offline] .sheep, .companion[data-mood=offline] .agent-portrait { filter:grayscale(1) brightness(.7) }
 .companion[data-mood=idle] .companion-figure { opacity:.72 }

@@ -165,3 +165,10 @@ test('running is decided by the caller, so a fresh provider turn overrides a sta
   const [, none] = computerRows(profiles, [{name:'macbook-m6', state:'connected'}], terms, () => false);
   assert.deepEqual([none.used, none.parked], [0, 2]);
 });
+
+test('a computer whose connection needs a login says so instead of just offline', () => {
+  const [, m6, pro] = computerRows(profiles, [{name:'macbook-m6', state:'needs_login'}, {name:'macbook-pro', state:'unreachable'}], []);
+  assert.equal(m6.state, 'needs-login');
+  assert.equal(m6.connected, false);
+  assert.equal(pro.state, 'offline');
+});

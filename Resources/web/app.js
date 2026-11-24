@@ -11,6 +11,7 @@ import { messageTag, awaitingResponse, tagHTML } from './message-tags.js';
 import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick } from './sound-rules.js';
 import { sheep } from './sheep.js';
 import { companionState, companionSummary, featuredAgent } from './companion.js';
+import { agentTrouble, machineTrouble } from './trouble.js';
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest, mainMachineLabel } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText, boardSummaryHTML, BOARD_LABELS } from './task-board.js';
 import { questionFormHTML, keepTyping } from './chat-questions.js';
@@ -102,7 +103,7 @@ const companionSettings={enabled:load('ui.companion.v1',true)!==false, attention
 function companionAttention(){
   const byAddress=new Map(inventory.filter(term=>term.state==='live').map(term=>[term.address,term]));
   const item=term=>({address:term.address,session:term.session,team:term.team||term.label||term.address});
-  return [...inventory.filter(term=>term.state==='live'&&term.program?.agent&&term.status==='blocked').map(item),
+  return [...inventory.filter(term=>term.state==='live'&&term.program?.agent&&(term.status==='blocked'||agentTrouble(term)==='login')).map(item),
     ...questions().filter(q=>['answerNeeded','needsCheck'].includes(q.state))   // an approval asked for another agent waits on that agent
       .map(q=>byAddress.get(q.approval?.address||q.address)).filter(Boolean).map(item)];
 }
@@ -115,12 +116,14 @@ function companionPortrait(term,mood){
 }
 function pushCompanion(){
   const state=companionState({connection:snapshot.connection,attention:companionAttention(),now:Date.now(),flash:companionFlash,
+    limited:inventory.filter(term=>agentTrouble(term)==='limit').length,
     working:inventory.filter(term=>term.state==='live'&&term.program?.agent&&workingNow(term)).length});
   companionTarget=state.target;
   const live=inventory.filter(term=>term.state==='live'&&term.program?.agent);
-  companionFace=featuredAgent({mood:state.mood,flash:state.flash,targetKey:state.target&&sessionKey(state.target),finishedKey:companionFinished,previousKey:companionFace,
+  const limitedTerm=live.find(term=>agentTrouble(term)==='limit');
+  companionFace=featuredAgent({mood:state.mood,flash:state.flash,targetKey:state.target&&sessionKey(state.target),limitKey:limitedTerm&&sessionKey(limitedTerm),finishedKey:companionFinished,previousKey:companionFace,
     workingKeys:live.filter(workingNow).sort((a,b)=>(b.statusMs||0)-(a.statusMs||0)).map(sessionKey)});
-  const message={mood:state.mood,count:state.count,working:state.working,flash:state.flash,flashAt:state.flashAt,lines:companionSummary(state,copy),
+  const message={mood:state.mood,count:state.count,working:state.working,limited:state.limited,flash:state.flash,flashAt:state.flashAt,lines:companionSummary(state,copy),
     face:companionPortrait(inventory.find(term=>sessionKey(term)===companionFace),state.mood),
     enabled:companionSettings.enabled,attentionOnly:companionSettings.attentionOnly,
     menu:{snooze:copy('companionSnooze'),off:copy('companionOff')}};
@@ -214,6 +217,8 @@ const seenEntries=new Map();
 // Chats follow the newest message until the person scrolls up; then a "to the bottom" button appears.
 const CHEVRON='<svg class="board-chevron" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 let boardOpen=load('ui.boardOpen.v1',false)===true;
+const KEY='<svg class="trouble-icon" viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><circle cx="4.5" cy="7" r="2.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 7h6M11 7v2.2M12.8 7v1.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+const HOURGLASS='<svg class="trouble-icon" viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><path d="M3.5 1.5h7M3.5 12.5h7M4.5 1.5c0 3 5 3.5 5 5.5s-5 2.5-5 5.5M9.5 1.5c0 3-5 3.5-5 5.5s5 2.5 5 5.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
 const DOWN='<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 2v7M2.5 6 6 9.5 9.5 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function showToBottom(selector,{stuck,unseen}){
   const button=$(selector);
@@ -480,6 +485,8 @@ function roomRoster(room){
 function memberStatus(term){
   if(term.state!=='live')return copy('directoryOffline');
   if(snapshot.connection!=='live')return copy(snapshot.connection);
+  const trouble=agentTrouble(term);
+  if(trouble==='login'||trouble==='limit')return copy('trouble_'+trouble);
   const status=effectiveStatus(term);
   if(status!=='working'&&!['blocked','error'].includes(term.status)&&delegatingNow(term))return copy('waitingOnOthers');
   return copy(status!=='working'&&assignmentActive(term)?'assignmentArrived':status);
@@ -512,8 +519,9 @@ for(const panel of [$('#roomFeed'),$('#chatLog')]){
 }
 
 function presence(term){
+  const trouble=agentTrouble(term);
   const state=snapshot.connection==='live'&&term?.state==='live'
-    ? ['blocked','error'].includes(term.status)?'due':workingNow(term)?'working':delegatingNow(term)?'waiting':'idle'
+    ? trouble==='login'||trouble==='limit'?trouble:['blocked','error'].includes(term.status)?'due':workingNow(term)?'working':delegatingNow(term)?'waiting':'idle'
     : 'offline';
   return '<i class="presence-dot" data-presence="'+state+'" aria-hidden="true"></i>';
 }
@@ -1378,13 +1386,20 @@ function renderChatContext(term,room) {
   const requests=page==='conversations'?roomQuestions(room,term):[];
   const request=requests.at(-1);
   const waiting=[term,...(room?.members||[])].find(member=>member?.state==='live'&&member.status==='blocked');
+  const troubled=snapshot.connection==='live'?[term,...(room?.members||[])].find(member=>['login','limit'].includes(agentTrouble(member))):null;
   const approval=$('#inlineApproval');
-  approval.hidden=!request&&!waiting || page!=='conversations';
+  approval.hidden=!request&&!waiting&&!troubled || page!=='conversations';
   const typing=approval.contains(document.activeElement)&&document.activeElement.matches('textarea')
     &&keepTyping(requests,document.activeElement.closest('[data-question]')?.dataset.question,snapshot.connection==='live',questionSending);
   if(request){
     if(!typing&&setPanel('#inlineApproval','<div class="chat-questions">'+requests.map(questionHTML).join('')+'</div>'))
       enterFresh(approval,'questions','data-question',POP,160);
+  }else if(troubled){
+    // a login or usage limit: say what the person can do, and offer the terminal where it is shown
+    const kind=agentTrouble(troubled);
+    setPanel('#inlineApproval','<div class="chat-approval chat-trouble" data-trouble="'+kind+'">'+(kind==='login'?KEY:HOURGLASS)
+      +'<span><strong>'+escape(copy('trouble_'+kind)+' · '+troubled.label)+'</strong><p>'+escape(copy('troubleHint_'+kind))+'</p></span>'
+      +'<button type="button" data-waiting-terminal="'+escape(sessionKey(troubled))+'">'+copy('terminal')+'</button></div>');
   }else if(waiting){
     setPanel('#inlineApproval','<div class="chat-approval"><strong>'+escape(copy('due')+' · '+waiting.label)
       +'</strong><button type="button" data-waiting-terminal="'+escape(sessionKey(waiting))+'">'+copy('terminal')+'</button></div>');

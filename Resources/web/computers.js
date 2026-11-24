@@ -1,7 +1,8 @@
 // Computers that can run card workers: connection (live from hc), readiness and weight class (machines.json
 // via the task board), and how many card workers each runs now. Pure: no DOM.
+import { machineTrouble } from './trouble.js';
 
-/** state: ready | not-ready | offline. The local Mac is always reachable. editable: the list came from machines.json.
+/** state: ready | not-ready | needs-login | offline. The local Mac is always reachable. editable: the list came from machines.json.
  *  main: the Mac HerdrDesk runs on, where the leads and records live; always listed first. */
 /** isWorking: the app's effective status (a fresh provider turn overrides a stale core status). */
 export function computerRows(profiles = [], liveMachines = [], terms = [], isWorking = term => term.status === 'working') {
@@ -18,7 +19,7 @@ export function computerRows(profiles = [], liveMachines = [], terms = [], isWor
     return { name: profile.name, label: profile.label || profile.name, tier: profile.tier || 'heavy', slots: profile.slots || 0,
              used, parked: seated.length - used, ready: !!profile.ready, connected, editable, main: profile.name === 'local',
              projects: profile.projects === '*' ? '*' : (profile.projects || {}), rolesOff: profile.rolesOff || {}, repos: profile.repos || {},
-             state: !connected ? 'offline' : profile.ready ? 'ready' : 'not-ready' };
+             state: !connected ? (machineTrouble({ state: live.get(profile.name) }) === 'login' ? 'needs-login' : 'offline') : profile.ready ? 'ready' : 'not-ready' };
   });
   return [...rows.filter(row => row.main), ...rows.filter(row => !row.main)];
 }
