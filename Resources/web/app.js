@@ -1386,7 +1386,9 @@ function renderChatContext(term,room) {
   const requests=page==='conversations'?roomQuestions(room,term):[];
   const request=requests.at(-1);
   const waiting=[term,...(room?.members||[])].find(member=>member?.state==='live'&&member.status==='blocked');
-  const troubled=snapshot.connection==='live'?[term,...(room?.members||[])].find(member=>['login','limit'].includes(agentTrouble(member))):null;
+  // what needs the person comes first: a login, then a permission prompt; a usage limit only shows when nothing else does
+  const people=snapshot.connection==='live'?[term,...(room?.members||[])]:[];
+  const troubled=people.find(member=>agentTrouble(member)==='login')||(!waiting&&people.find(member=>agentTrouble(member)==='limit'))||null;
   const approval=$('#inlineApproval');
   approval.hidden=!request&&!waiting&&!troubled || page!=='conversations';
   const typing=approval.contains(document.activeElement)&&document.activeElement.matches('textarea')
