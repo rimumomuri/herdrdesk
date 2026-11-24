@@ -1301,3 +1301,9 @@ details.settings[open] .settings-menu { animation:desk-pop 140ms var(--motion-ea
 .board-card[data-waiting=true] { opacity:.62 }
 .board-card-waiting { display:flex; gap:4px; align-items:center; font-size:10px; color:var(--warn) }
 .board-card-waiting svg { flex:none }
+.to-bottom { position:relative; z-index:3; align-self:center; justify-self:center; margin:-38px auto 8px; display:inline-flex; align-items:center; gap:5px;
+  padding:5px 11px; border-radius:999px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:11px;
+  box-shadow:0 4px 14px #0007; animation:desk-pop 140ms var(--motion-ease) }
+.to-bottom[data-unseen=true] { border-color:#6f86b8; color:#cfe0ff }
+.to-bottom[hidden], #chatHistory[hidden] + .to-bottom, #roomFeed[hidden] + .to-bottom { display:none }
+@media(prefers-reduced-motion:reduce) { .to-bottom { animation:none } }
