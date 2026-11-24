@@ -16,10 +16,10 @@ function nudge() {
 }
 
 window.companion = {
-  /** state: {mood, count, working, flash, lines} */
+  /** state: {mood, count, working, flash, flashAt, lines} */
   show(state) {
     const moodChanged = current?.mood !== state.mood;
-    const newFlash = state.flash && state.flash !== current?.flash;
+    const newFlash = state.flash && (state.flash !== current?.flash || state.flashAt !== current?.flashAt);
     root.hidden = false;
     root.dataset.mood = state.mood;
     if (moodChanged || newFlash || !root.querySelector('.sheep'))
