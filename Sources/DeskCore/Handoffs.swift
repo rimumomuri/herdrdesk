@@ -77,6 +77,8 @@ public struct HandoffEdge: Codable {
     public var returnedAt: Double?
     public var flowId: String?
     public var lineageId: String?
+    /// When the receiver answered it (a reply card). Kept on the edge: cards are capped and pruned.
+    public var answeredAt: Double? = nil
     var isOpen: Bool { ["open", "weak", "unconfirmed"].contains(state) }
 }
 
@@ -133,7 +135,8 @@ public final class HandoffBook {
         if m.from != .desk, m.to != .desk,
            let i = edges.lastIndex(where: { ($0.from.same(m.to) && $0.to.same(m.from)) || ($0.from.same(m.from) && $0.to.same(m.to)) }),
            edges[i].from.same(m.to), edges[i].state == "closed", let ended = edges[i].closedAt, m.at - ended <= Self.answerWindow,
-           !cards.contains(where: { $0.id.hasPrefix("c:\(edges[i].id):") && $0.kind == "reply" && $0.from.same(m.from) }) {
+           edges[i].answeredAt == nil {
+            edges[i].answeredAt = m.at
             _ = addCard(edges[i], at: m.at, kind: "reply", from: m.from, to: m.to, body: body)
             return
         }
@@ -274,6 +277,7 @@ public final class HandoffBook {
 
     private func resolvePending(_ e: inout HandoffEdge, as kind: String) {
         if let id = e.pendingCardId, let c = cards.lastIndex(where: { $0.id == id }) { cards[c].kind = kind }
+        if kind == "reply" { e.answeredAt = e.pendingReplyAt ?? e.answeredAt }
         e.pendingReplyAt = nil; e.pendingCardId = nil; e.busyAfterReply = nil
     }
 

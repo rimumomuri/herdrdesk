@@ -97,6 +97,19 @@ final class HandoffTests: XCTestCase {
         XCTAssertEqual(book.cards.last?.kind, "assign")
     }
 
+    func testAnswerIsRememberedAfterCardsArePruned() {
+        let book = HandoffBook()
+        book.record(msg(prod, lead, t0, "question"))
+        book.observe(signals(["t1":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t1":"idle"]), now: t0 + 60_000)
+        book.record(msg(lead, prod, t0 + 90_000, "answer"))
+        for n in 0...HandoffBook.maxCards { book.record(msg(qa, prod, t0 + 100_000 + Double(n), "note \(n)")) }
+        book.prune(now: t0 + 200_000)
+        book.record(msg(lead, prod, t0 + 300_000, "now build the next screen"))
+        XCTAssertEqual(book.cards.last?.kind, "assign")
+        XCTAssertTrue(book.edges.contains { $0.isOpen && $0.from.same(lead) && $0.to.same(prod) })
+    }
+
     func testLateAnswerOpensAHandoffAsBefore() {
         let book = HandoffBook()
         book.record(msg(prod, lead, t0, "question"))
