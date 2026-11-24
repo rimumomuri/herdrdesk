@@ -47,6 +47,124 @@ final class HandoffTests: XCTestCase {
         XCTAssertTrue(book.edges[1].isOpen)
     }
 
+    func testAnswerToTheOtherSidesFinishedRequestDoesNotOpenAHandoff() {
+        let book = HandoffBook()
+        book.record(msg(prod, lead, t0, "which test environment do you have?"))
+        book.observe(signals(["t1":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t1":"idle"]), now: t0 + 60_000)
+        XCTAssertEqual(book.edges[0].state, "closed")
+        book.record(msg(lead, prod, t0 + 1_800_000, "the QA environment is partly ready"))
+        XCTAssertEqual(book.edges.count, 1)
+        XCTAssertFalse(book.edges.contains { $0.isOpen })
+        XCTAssertEqual(book.cards.last?.kind, "reply")
+        // the answer is not work handed over, so a busy asker never keeps it waiting
+        book.observe(signals(["t2":"working"]), now: t0 + 1_900_000)
+        XCTAssertFalse(book.edges.contains { $0.isOpen })
+    }
+
+    func testNewRequestAfterTheOtherSideHandedSomethingBackIsStillAHandoff() {
+        let book = HandoffBook()
+        book.record(msg(prod, lead, t0, "question"))
+        book.observe(signals(["t1":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t1":"idle"]), now: t0 + 60_000)
+        book.record(msg(lead, prod, t0 + 1_800_000, "answer"))
+        // only the first word back answers; what follows is new work
+        book.record(msg(lead, prod, t0 + 2_100_000, "now build the next screen"))
+        XCTAssertEqual(book.edges.count, 2)
+        XCTAssertTrue(book.edges[1].isOpen)
+        XCTAssertEqual(book.cards.last?.kind, "assign")
+    }
+
+    func testRequestAfterAStaleHandoffIsStillAHandoff() {
+        let book = HandoffBook()
+        book.record(msg(prod, lead, t0, "question"))
+        book.observe(signals([:]), now: t0 + HandoffBook.staleAfter + 1)
+        XCTAssertEqual(book.edges[0].state, "stale")
+        book.record(msg(lead, prod, t0 + HandoffBook.staleAfter + 60_000, "please check this"))
+        XCTAssertEqual(book.edges.count, 2)
+        XCTAssertEqual(book.cards.last?.kind, "assign")
+    }
+
+    func testAcknowledgedAnswerDoesNotMakeTheNextTaskAnAnswer() {
+        let book = HandoffBook()
+        book.record(msg(prod, lead, t0, "question"))
+        book.observe(signals(["t1":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t1":"idle"]), now: t0 + 60_000)
+        book.record(msg(lead, prod, t0 + 90_000, "answer"))
+        book.record(msg(prod, lead, t0 + 100_000, "thanks, got it"))
+        book.record(msg(lead, prod, t0 + 1_200_000, "now build the next screen"))
+        XCTAssertTrue(book.edges.last?.isOpen ?? false)
+        XCTAssertEqual(book.cards.last?.kind, "assign")
+    }
+
+    func testAnswerIsRememberedAfterCardsArePruned() {
+        let book = HandoffBook()
+        book.record(msg(prod, lead, t0, "question"))
+        book.observe(signals(["t1":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t1":"idle"]), now: t0 + 60_000)
+        book.record(msg(lead, prod, t0 + 90_000, "answer"))
+        for n in 0...HandoffBook.maxCards { book.record(msg(qa, prod, t0 + 100_000 + Double(n), "note \(n)")) }
+        book.prune(now: t0 + 200_000)
+        book.record(msg(lead, prod, t0 + 300_000, "now build the next screen"))
+        XCTAssertEqual(book.cards.last?.kind, "assign")
+        XCTAssertTrue(book.edges.contains { $0.isOpen && $0.from.same(lead) && $0.to.same(prod) })
+    }
+
+    func testReplyClosedByFlowCountsAsTheAnswer() {
+        let book = HandoffBook()
+        book.record(msg(lead, prod, t0))
+        book.record(msg(prod, lead, t0 + 3_000, "result"))
+        var s = signals(["t2":"working"])
+        s.flows = [HandoffFlow(worker:prod, lead:lead, id:"f1", phase:"result-sent", updatedAt:t0 + 4_000)]
+        book.observe(s, now: t0 + 5_000)
+        XCTAssertEqual(book.edges[0].state, "closed")
+        book.record(msg(prod, lead, t0 + 600_000, "separate request: review my PR"))
+        XCTAssertEqual(book.cards.last?.kind, "assign")
+        XCTAssertTrue(book.edges.contains { $0.isOpen && $0.from.same(prod) })
+    }
+
+    func testRequestAfterAClosureWithoutResultIsStillAHandoff() {
+        let book = HandoffBook()
+        book.record(msg(prod, lead, t0, "question"))
+        book.observe(signals(["t1":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t1":"idle"], sessions: ["t1":"999:9","t2":"200:2"]), now: t0 + 60_000)
+        XCTAssertEqual(book.edges[0].state, "closed")
+        XCTAssertNil(book.edges[0].returnedAt)
+        book.record(msg(lead, prod, t0 + 120_000 + 1, "please check this"))
+        XCTAssertEqual(book.cards.last?.kind, "assign")
+    }
+
+    func testSavedBookRemembersAnswersFromReplyCards() {
+        let book = HandoffBook()
+        book.record(msg(lead, prod, t0))
+        book.record(msg(prod, lead, t0 + 3_000, "result"))
+        book.observe(signals(["t2":"idle"]), now: t0 + 5_000)
+        var edges = book.edges
+        edges[0].answeredAt = nil   // as saved by the previous version
+        let loaded = HandoffBook(edges: edges, cards: book.cards)
+        XCTAssertEqual(loaded.edges[0].answeredAt, t0 + 3_000)
+    }
+
+    func testOlderMessageArrivingLateIsNotTheAnswer() {
+        let book = HandoffBook()
+        book.record(msg(prod, lead, t0, "question"))
+        book.observe(signals(["t1":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t1":"idle"]), now: t0 + 60_000)
+        book.record(msg(lead, prod, t0 - 500_000, "something from before the question"))
+        XCTAssertNil(book.edges[0].answeredAt)
+        XCTAssertNotEqual(book.cards.last?.kind, "reply")
+    }
+
+    func testLateAnswerOpensAHandoffAsBefore() {
+        let book = HandoffBook()
+        book.record(msg(prod, lead, t0, "question"))
+        book.observe(signals(["t1":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t1":"idle"]), now: t0 + 60_000)
+        book.record(msg(lead, prod, t0 + 60_000 + HandoffBook.answerWindow + 1, "much later"))
+        XCTAssertEqual(book.edges.count, 2)
+        XCTAssertEqual(book.cards.last?.kind, "assign")
+    }
+
     func testLaterFollowUpOnOpenHandoffIsAnAddition() {
         let book = HandoffBook()
         book.record(msg(lead, prod, t0))
