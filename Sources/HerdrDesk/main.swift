@@ -98,6 +98,7 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
     private var watchGeneration = 0
     private var currentGrid: (cols: Int, rows: Int)?
     private var ready = false
+    private var companion: CompanionPanel?
     private var currentSound: NSSound?
     private let systemSounds = SystemSounds.names()
     private let attachmentStore = AttachmentStore(root: AttachmentStore.defaultRoot())
@@ -140,6 +141,18 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
         let bundleWeb = Bundle.main.resourceURL!.appendingPathComponent("web")
         index = bundleWeb.appendingPathComponent("index.html")
         web.loadFileURL(index, allowingReadAccessTo: bundleWeb)
+        if !isolated {
+            let companion = CompanionPanel(webFolder: bundleWeb)
+            companion.onOpen = { [weak self] in
+                guard let self else { return }
+                NSApp.activate(ignoringOtherApps: true)
+                if self.window.isMiniaturized { self.window.deminiaturize(nil) }
+                self.window.makeKeyAndOrderFront(nil)
+                self.call("window.desk.openCompanionTarget()", [:])
+            }
+            companion.onTurnOff = { [weak self] in self?.call("window.desk.companionOff()", [:]) }
+            self.companion = companion
+        }
         connect()
         loadArchivedAttachmentRoles()
         captureIfRequested()
@@ -427,6 +440,8 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
             currentSound?.stop()
             currentSound = sound
             currentSound?.play()
+        case "companion":
+            if let state = body["state"] as? [String: Any] { companion?.update(state) }
         case "refresh":
             refreshInventory()
         case "chooseCore":

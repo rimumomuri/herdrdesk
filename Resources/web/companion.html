@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>HerdrDesk companion</title>
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="companion.css">
+</head>
+<body class="companion-body">
+<div id="companion" class="companion" data-mood="idle" hidden>
+ <div id="companionBubble" class="companion-bubble"></div>
+ <div class="companion-figure"><span id="companionSheep"></span><b id="companionBadge" class="companion-badge" hidden></b><i id="companionFlash" class="companion-flash" hidden></i></div>
+</div>
+<script src="companion-bundle.js"></script>
+</body>
+</html>

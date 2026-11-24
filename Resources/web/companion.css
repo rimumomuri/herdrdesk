@@ -1,0 +1,32 @@
+/* The floating companion window: a transparent page with one sheep at its right edge and a bubble that opens on hover. */
+html, body { margin:0; height:100%; overflow:hidden; background:transparent!important }
+body.companion-body { display:block; min-height:0; min-width:0 }
+.companion { position:fixed; inset:0; display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:0 10px;
+  font:12px -apple-system, system-ui, sans-serif; color:var(--ink); user-select:none; -webkit-user-select:none; cursor:default }
+.companion[hidden] { display:none }
+.companion-figure { position:relative; flex:none; width:64px; height:64px; display:grid; place-items:center; border-radius:50%;
+  background:#1d1d21eb; box-shadow:0 4px 14px #0008, inset 0 0 0 1px #ffffff17; transition:opacity .2s ease, box-shadow .2s ease }
+.companion .sheep { width:46px; height:35px }
+.companion-badge { position:absolute; top:-2px; right:-2px; min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; border-radius:9px;
+  font-size:11px; font-weight:700; line-height:18px; text-align:center; color:#fff; background:#3d6fd6; box-shadow:0 0 0 2px #1d1d21 }
+.companion[data-mood=attention] .companion-badge { background:#e5484d }
+.companion[data-mood=offline] .companion-badge { width:18px; padding:0; display:grid; place-items:center; background:#5a5a62 }
+.companion[data-mood=attention] .companion-figure { box-shadow:0 4px 14px #0008, 0 0 0 2px #e5484daa }
+.companion[data-mood=offline] .sheep { filter:grayscale(1) brightness(.7) }
+.companion[data-mood=idle] .companion-figure { opacity:.72 }
+.companion[data-mood=idle] .sheep-eye { transform:scaleY(.18) }
+.companion-flash { position:absolute; top:-2px; left:-2px; width:20px; height:20px; border-radius:50%; display:grid; place-items:center;
+  color:#fff; background:#2f9e5b; box-shadow:0 0 0 2px #1d1d21; animation:companion-pop .25s var(--motion-ease) both }
+.companion-flash[data-kind=handoff] { background:#7a5af5 }
+.companion-flash[hidden], .companion-badge[hidden] { display:none }
+.companion-bubble { display:none; max-width:220px; padding:7px 10px; border-radius:10px; line-height:1.4;
+  background:#1d1d21f2; box-shadow:0 4px 14px #0008, inset 0 0 0 1px #ffffff17 }
+.companion-bubble:empty { display:none!important }
+.companion-bubble div { white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.companion.hovered .companion-bubble { display:block; animation:companion-pop .16s var(--motion-ease) both }
+.companion.nudge .sheep-animal { animation:companion-bounce .9s var(--motion-ease) both }
+.companion.nudge .companion-figure { animation:companion-ring 1s ease-out both }
+@keyframes companion-bounce { 0%,100% { transform:none } 20% { transform:translateY(-6px) rotate(-6deg) } 42% { transform:rotate(4deg) } 62% { transform:translateY(-3px) rotate(-3deg) } }
+@keyframes companion-ring { 0% { outline:2px solid #e5484d; outline-offset:0 } 100% { outline:2px solid #e5484d00; outline-offset:12px } }
+@keyframes companion-pop { from { transform:scale(.85); opacity:0 } to { transform:none; opacity:1 } }
+@media(prefers-reduced-motion:reduce) { .companion, .companion * { animation:none!important; transition:none!important } }
