@@ -101,7 +101,14 @@ public final class HandoffBook {
     public private(set) var edges: [HandoffEdge]
     public private(set) var cards: [HandoffCard]
 
-    public init(edges: [HandoffEdge] = [], cards: [HandoffCard] = []) { self.edges = edges; self.cards = cards }
+    public init(edges: [HandoffEdge] = [], cards: [HandoffCard] = []) {
+        self.edges = edges; self.cards = cards
+        // Books saved before `answeredAt` existed: a reply card from the receiver means it was answered.
+        for i in self.edges.indices where self.edges[i].answeredAt == nil {
+            let e = self.edges[i]
+            if let reply = cards.last(where: { $0.id.hasPrefix("c:\(e.id):") && $0.kind == "reply" && $0.from.same(e.to) }) { self.edges[i].answeredAt = reply.at }
+        }
+    }
 
     public func record(_ m: HandoffMessage) {
         let body = Self.summary(m.body)
@@ -134,7 +141,7 @@ public final class HandoffBook {
         // it is not new work, so a busy receiver must not keep it "waiting" for hours.
         if m.from != .desk, m.to != .desk,
            let i = edges.lastIndex(where: { ($0.from.same(m.to) && $0.to.same(m.from)) || ($0.from.same(m.from) && $0.to.same(m.to)) }),
-           edges[i].from.same(m.to), edges[i].state == "closed", let ended = edges[i].closedAt, m.at - ended <= Self.answerWindow,
+           edges[i].from.same(m.to), edges[i].state == "closed", edges[i].returnedAt != nil, let ended = edges[i].closedAt, m.at - ended <= Self.answerWindow,
            edges[i].answeredAt == nil {
             edges[i].answeredAt = m.at
             _ = addCard(edges[i], at: m.at, kind: "reply", from: m.from, to: m.to, body: body)

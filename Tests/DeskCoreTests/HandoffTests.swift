@@ -123,6 +123,28 @@ final class HandoffTests: XCTestCase {
         XCTAssertTrue(book.edges.contains { $0.isOpen && $0.from.same(prod) })
     }
 
+    func testRequestAfterAClosureWithoutResultIsStillAHandoff() {
+        let book = HandoffBook()
+        book.record(msg(prod, lead, t0, "question"))
+        book.observe(signals(["t1":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t1":"idle"], sessions: ["t1":"999:9","t2":"200:2"]), now: t0 + 60_000)
+        XCTAssertEqual(book.edges[0].state, "closed")
+        XCTAssertNil(book.edges[0].returnedAt)
+        book.record(msg(lead, prod, t0 + 120_000 + 1, "please check this"))
+        XCTAssertEqual(book.cards.last?.kind, "assign")
+    }
+
+    func testSavedBookRemembersAnswersFromReplyCards() {
+        let book = HandoffBook()
+        book.record(msg(lead, prod, t0))
+        book.record(msg(prod, lead, t0 + 3_000, "result"))
+        book.observe(signals(["t2":"idle"]), now: t0 + 5_000)
+        var edges = book.edges
+        edges[0].answeredAt = nil   // as saved by the previous version
+        let loaded = HandoffBook(edges: edges, cards: book.cards)
+        XCTAssertEqual(loaded.edges[0].answeredAt, t0 + 3_000)
+    }
+
     func testLateAnswerOpensAHandoffAsBefore() {
         let book = HandoffBook()
         book.record(msg(prod, lead, t0, "question"))
