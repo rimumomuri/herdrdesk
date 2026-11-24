@@ -502,7 +502,7 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                     }
                 }
             } else if let answer = field("text", 2000) {
-                confirmAnswer(id: id, asker: asker, role: role, text: answer, client: sender)
+                sendAnswer(id: id, asker: asker, role: role, text: answer, client: sender)
             } else {
                 questionResult(id, "refused")
             }
@@ -648,36 +648,19 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
         push()
     }
 
-    private func confirmAnswer(id: String, asker: Term, role: String, text: String, client: AnswerSender) {
-        guard checkText(text) == nil, validate(term: asker, questionId: id) == nil,
+    /// Sends the answer the person typed and submitted in the focused HerdrDesk window; no second confirmation.
+    private func sendAnswer(id: String, asker: Term, role: String, text: String, client: AnswerSender) {
+        guard window.isKeyWindow, NSApp.isActive, checkText(text) == nil, validate(term: asker, questionId: id) == nil,
               environment["HERDRDESK_NO_SEND"] != "1" else { questionResult(id, "refused"); return }
-        let strings: [String]
-        switch currentLanguage {
-        case "ko": strings = ["이 답변을 보낼까요?", "답변 보내기", "취소"]
-        case "ja": strings = ["この回答を送信しますか？", "回答を送信", "キャンセル"]
-        default: strings = ["Send this answer?", "Send answer", "Cancel"]
-        }
-        let alert = NSAlert()
-        alert.messageText = strings[0]
-        alert.informativeText = "\(asker.name ?? role) · \(asker.address)\n\n\(text)"
-        alert.addButton(withTitle: strings[1])
-        alert.addButton(withTitle: strings[2])
-        alert.beginSheetModal(for: window) { response in
-            guard response == .alertFirstButtonReturn else { self.questionResult(id, "cancel"); return }
-            guard self.connection == "live",
-                  self.target(address: asker.address, session: asker.session) != nil else {
-                self.questionResult(id, "refused"); return
+        commands.async {
+            let state: String
+            switch client.send(role: role, questionId: id, text: text) {
+            case .sent: state = "sent"
+            case .notSent: state = "notSent"
+            case .needsCheck: state = "needsCheck"
+            case .refused: state = "refused"
             }
-            self.commands.async {
-                let state: String
-                switch client.send(role: role, questionId: id, text: text) {
-                case .sent: state = "sent"
-                case .notSent: state = "notSent"
-                case .needsCheck: state = "needsCheck"
-                case .refused: state = "refused"
-                }
-                DispatchQueue.main.async { self.questionResult(id, state) }
-            }
+            DispatchQueue.main.async { self.questionResult(id, state) }
         }
     }
 

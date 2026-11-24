@@ -2209,6 +2209,17 @@ panel.addEventListener('click',event=>{
   }
   if(target.hasAttribute('data-approval'))checkApprovalTarget(form.dataset.question);
 });
+// Enter sends the answer like the composer (Shift+Enter: new line; never while an input method is composing).
+let answerComposing=false, answerComposed=-Infinity;
+panel.addEventListener('compositionstart',()=>{answerComposing=true});
+panel.addEventListener('compositionend',()=>{answerComposing=false;answerComposed=performance.now()});
+panel.addEventListener('keydown',event=>{
+  const form=event.target.closest?.('[data-question]');
+  if(!form||!event.target.matches('textarea'))return;
+  const action=enterAction(event,answerComposing,performance.now()-answerComposed);
+  if(action==='swallow'||action==='send')event.preventDefault();
+  if(action==='send')form.requestSubmit();
+});
 panel.addEventListener('submit',event=>{
   event.preventDefault();
   const form=event.target,id=form.dataset.question,text=form.elements.answer?.value.trim();
