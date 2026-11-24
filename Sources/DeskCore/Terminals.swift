@@ -64,7 +64,7 @@ public struct Term: Equatable {
         options["defaultModel"] = defaults["model"]
         options["defaultEffort"] = defaults["effort"]
         let keep = labels.filter { k, _ in
-            k == "recovery.role" || k == "display.title" || k.hasPrefix("team.") || k.hasPrefix("dashboard.") || k.hasPrefix("ask.")
+            k == "recovery.role" || k == "display.title" || k == "task.spawned" || k.hasPrefix("team.") || k.hasPrefix("dashboard.") || k.hasPrefix("ask.")
                 || k.hasPrefix("flow.") || k.hasPrefix("flowack.") || k.hasPrefix("result.")
         }
         return ["address": address, "name": name ?? NSNull(), "parent": parent ?? NSNull(), "state": state, "agent": app ?? NSNull(), "status": status ?? "unknown",

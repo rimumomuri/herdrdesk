@@ -77,6 +77,16 @@ final class HardeningTests: XCTestCase {
         XCTAssertEqual(updated.terms["t1"]?.turn,7)
     }
 
+    func testPageSeesWhichTerminalsAreSpawnedWorkersButNotOtherTaskLabels() {
+        let store = TerminalStore()
+        store.replace(address:"t9",with:["address":"t9","state":"live","created_ms":1,"pid":2,
+            "labels":["task.spawned":"1","task.id":"kunkun-000053","secret.token":"x"]])
+        let labels = store.terms["t9"]?.publicJSON["labels"] as? [String:String]
+        XCTAssertEqual(labels?["task.spawned"],"1")
+        XCTAssertNil(labels?["task.id"])
+        XCTAssertNil(labels?["secret.token"])
+    }
+
     // MARK: lock and hc runner
 
     func testFileLockReleaseIsIdempotent() throws {
