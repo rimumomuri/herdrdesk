@@ -64,4 +64,16 @@ final class CompanionTests: XCTestCase {
         XCTAssertEqual(left.frame, CGRect(x: 30, y: 700, width: CompanionLayout.wide, height: 84))
         XCTAssertTrue(left.bubbleRight)
     }
+
+    func testFaceKeepsOnlyKnownLookFields() {
+        let face = CompanionLayout.pageState(["mood": "working", "face": ["provider": "codex", "style": "lamb", "coat": "cocoa", "accessory": "crown",
+                                                                         "sleeping": false, "working": true, "name": "킁킁 총괄"]])?["face"] as? [String: Any]
+        XCTAssertEqual(face?["provider"] as? String, "codex")
+        XCTAssertEqual(face?["style"] as? String, "lamb")
+        XCTAssertEqual(face?["working"] as? Bool, true)
+        XCTAssertNil(face?["name"])
+        XCTAssertNil(CompanionLayout.pageState(["mood": "working", "face": ["provider": "<script>"]])?["face"] as? [String: Any])
+        XCTAssertNil(CompanionLayout.pageState(["mood": "working", "face": ["provider": "codex", "style": "\"><img>"]])?["face"] as? [String: Any])
+        XCTAssertNil(CompanionLayout.pageState(["mood": "working"])?["face"] as? [String: Any])
+    }
 }

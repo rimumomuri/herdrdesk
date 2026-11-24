@@ -10,7 +10,7 @@ import { buildChain, handoffCardsFor, handoffCardHTML, isDelegating } from './ha
 import { messageTag, awaitingResponse, tagHTML } from './message-tags.js';
 import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick } from './sound-rules.js';
 import { sheep } from './sheep.js';
-import { companionState, companionSummary } from './companion.js';
+import { companionState, companionSummary, featuredAgent } from './companion.js';
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest, mainMachineLabel } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText, boardSummaryHTML, BOARD_LABELS } from './task-board.js';
 import { questionFormHTML, keepTyping } from './chat-questions.js';
@@ -97,7 +97,7 @@ function checkAttention(){
 }
 setInterval(checkAttention,5000);
 // The floating companion sheep: same signals as the sounds; Swift shows it only while HerdrDesk is in the background.
-let companionFlash=null, companionTarget=null, companionSignature='';
+let companionFlash=null, companionTarget=null, companionSignature='', companionFinished=null, companionFace=null;
 const companionSettings={enabled:load('ui.companion.v1',true)!==false, attentionOnly:load('ui.companionAttentionOnly.v1',false)===true};
 function companionAttention(){
   const byAddress=new Map(inventory.filter(term=>term.state==='live').map(term=>[term.address,term]));
@@ -106,11 +106,22 @@ function companionAttention(){
     ...questions().filter(q=>['answerNeeded','needsCheck'].includes(q.state))   // an approval asked for another agent waits on that agent
       .map(q=>byAddress.get(q.approval?.address||q.address)).filter(Boolean).map(item)];
 }
+/** The agent's own character for the companion: provider and chosen look, never names or text. Null when it has none. */
+function companionPortrait(term,mood){
+  const provider=portraitProvider(term), character=term&&characters.get(characterID(term));
+  if(!provider&&!character)return null;
+  return {provider:provider||'neutral',style:character?.style||'classic',coat:character?.coat||'cream',accessory:character?.accessory||'none',
+    sleeping:mood==='idle'||mood==='offline',working:mood!=='attention'&&workingNow(term)};
+}
 function pushCompanion(){
   const state=companionState({connection:snapshot.connection,attention:companionAttention(),now:Date.now(),flash:companionFlash,
     working:inventory.filter(term=>term.state==='live'&&term.program?.agent&&workingNow(term)).length});
   companionTarget=state.target;
+  const live=inventory.filter(term=>term.state==='live'&&term.program?.agent);
+  companionFace=featuredAgent({mood:state.mood,flash:state.flash,targetKey:state.target&&sessionKey(state.target),finishedKey:companionFinished,previousKey:companionFace,
+    workingKeys:live.filter(workingNow).sort((a,b)=>(b.statusMs||0)-(a.statusMs||0)).map(sessionKey)});
   const message={mood:state.mood,count:state.count,working:state.working,flash:state.flash,flashAt:state.flashAt,lines:companionSummary(state,copy),
+    face:companionPortrait(inventory.find(term=>sessionKey(term)===companionFace),state.mood),
     enabled:companionSettings.enabled,attentionOnly:companionSettings.attentionOnly,
     menu:{snooze:copy('companionSnooze'),off:copy('companionOff')}};
   const signature=JSON.stringify(message);
@@ -2362,7 +2373,7 @@ window.desk={
         const key=sessionKey(term), before=soundStates.get(key);
         const wasWorking=term.status==='working'||(term.status==='blocked'&&before?.wasWorking);
         nextSoundStates.set(key,{status:term.status,wasWorking,turn:term.turn,statusMs:term.statusMs});
-        if(completedAgentTurn(before,term))didComplete=true;
+        if(completedAgentTurn(before,term)){didComplete=true;companionFinished=key;}
       }
     }
     soundStates=nextSoundStates;

@@ -7,4 +7,4 @@ const bundle = (list, out) => writeFileSync(new URL(out, folder), '(() => {\n"us
   .replace(/^export /gm, '')).join('\n') + '\n})();\n');
 bundle(files, 'bundle.js');
 // The floating companion window: its own small page, never app.js.
-bundle(['sheep.js', 'companion-page.js'], 'companion-bundle.js');
+bundle(['sheep.js', 'portrait.js', 'companion-page.js'], 'companion-bundle.js');

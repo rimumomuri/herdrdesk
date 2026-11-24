@@ -7,7 +7,7 @@ const NUDGE_EVERY = 60_000;
 
 const root = document.getElementById('companion');
 const escapeText = text => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-let current = null, nudgeTimer = null;
+let current = null, nudgeTimer = null, currentFace = null;
 
 function nudge() {
   root.classList.remove('nudge');
@@ -16,14 +16,23 @@ function nudge() {
 }
 
 window.companion = {
-  /** state: {mood, count, working, flash, flashAt, lines} */
+  /** state: {mood, count, working, flash, flashAt, lines, face: {provider, style, coat, accessory, sleeping, working} | null} */
   show(state) {
     const moodChanged = current?.mood !== state.mood;
     const newFlash = state.flash && (state.flash !== current?.flash || state.flashAt !== current?.flashAt);
     root.hidden = false;
     root.dataset.mood = state.mood;
-    if (moodChanged || newFlash || !root.querySelector('.sheep'))
+    const face = state.face, faceKey = JSON.stringify(face);
+    if (face) {
+      // the agent's own character, drawn the way the main window draws it
+      if (faceKey !== currentFace || newFlash) {
+        const art = portraitArtwork(face.provider, false, face.style, face.coat, false, face.accessory, face.sleeping);
+        document.getElementById('companionSheep').innerHTML = face.working ? withWorkTool(art) : art;
+      }
+    } else if (moodChanged || newFlash || currentFace !== 'sheep' || !root.querySelector('.sheep')) {
       document.getElementById('companionSheep').innerHTML = sheep(newFlash ? (state.flash === 'handoff' ? 'handoff' : 'notice') : 'still');
+    }
+    currentFace = face ? faceKey : 'sheep';
     const badge = document.getElementById('companionBadge');
     badge.hidden = !['attention', 'working', 'offline'].includes(state.mood);
     badge.innerHTML = state.mood === 'offline' ? UNPLUGGED : String(state.mood === 'attention' ? state.count : state.working);
