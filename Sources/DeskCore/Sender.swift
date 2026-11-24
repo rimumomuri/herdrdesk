@@ -125,19 +125,17 @@ public final class AnswerSender {
             guard !r.timedOut, r.code == 0, let path = obj?["path"] as? String, path.hasPrefix("/") else {
                 entry.state = "not_sent"; entry.note = "image put failed: \(a.name)"; entry.at = iso()
                 try? ledger.write(questionId, entry)
-                _ = hc.run(["label", term.address, "ask.state=open"], timeout: 15)
+                reopenIfStillSending(role: role, term: term, questionId: questionId)
                 return .notSent("이미지 '\(a.name)'을 전달하지 못해 답변을 보내지 않았어요")
             }
             landed.append((path, a))
         }
         if !landed.isEmpty {
             // the asker must still be the same open question after the copies
-            // (its ask.state now reads "sending", set above, so the full open-question check no longer applies)
-            guard case .success(let current) = fetchRole(role), current.address == term.address, current.session == term.session,
-                  Question(labels: current.labels)?.id == questionId, !["blocked", "error"].contains(current.status ?? "") else {
+            guard case .success(let current) = fetchRole(role), stillSending(current, term: term, questionId: questionId) else {
                 entry.state = "not_sent"; entry.note = "question changed during image transfer"; entry.at = iso()
                 try? ledger.write(questionId, entry)
-                _ = hc.run(["label", term.address, "ask.state=open"], timeout: 15)
+                reopenIfStillSending(role: role, term: term, questionId: questionId)
                 return .notSent("The question changed before delivery.")
             }
             entry.note = "images: " + landed.map { $0.path }.joined(separator: ", ")
@@ -181,6 +179,23 @@ public final class AnswerSender {
         entry.at = iso()
         try? ledger.write(questionId, entry)
         return outcome
+    }
+
+    /// The asker still shows this question, in this send's "sending" state, in the same session, unexpired and not
+    /// waiting on a person. Checked after image copies, which take time (it may have been withdrawn meanwhile).
+    func stillSending(_ current: Term, term: Term, questionId: String) -> Bool {
+        guard current.address == term.address, current.session == term.session, current.isAgent,
+              let q = Question(labels: current.labels), q.id == questionId, q.state == "sending", q.session == term.session,
+              !["blocked", "error"].contains(current.status ?? "") else { return false }
+        if let e = q.expires, e < now() { return false }
+        return true
+    }
+
+    /// Puts the question back to open only if nothing else changed it during the copy (never reopens a withdrawn one).
+    private func reopenIfStillSending(role: String, term: Term, questionId: String) {
+        guard case .success(let current) = fetchRole(role), current.address == term.address, current.session == term.session,
+              let q = Question(labels: current.labels), q.id == questionId, q.state == "sending" else { return }
+        _ = hc.run(["label", term.address, "ask.state=open"], timeout: 15)
     }
 
     /// The person checked Herdr and says what happened to a `needs_check` send.

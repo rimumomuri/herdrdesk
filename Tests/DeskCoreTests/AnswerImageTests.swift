@@ -81,6 +81,37 @@ final class AnswerImageTests: XCTestCase {
         }
     }
 
+    func testWithdrawnDuringTheCopySendsNothingAndStaysWithdrawn() throws {
+        let hc = MutateHc { labels in labels["ask.state"] = "withdrawn" }; let (s, _) = try sender(hc)
+        guard case .notSent = s.send(role:"asker", questionId:"qImage0001", text:"This one", attachments:[image]) else { return XCTFail("expected notSent") }
+        XCTAssertNil(hc.sent)
+        XCTAssertEqual((hc.target["labels"] as? [String: Any])?["ask.state"] as? String, "withdrawn")
+    }
+
+    func testExpiredDuringTheCopySendsNothing() throws {
+        let hc = MutateHc { labels in labels["ask.expires"] = "2001-01-01T00:00:00Z" }; let (s, _) = try sender(hc)
+        guard case .notSent = s.send(role:"asker", questionId:"qImage0001", text:"This one", attachments:[image]) else { return XCTFail("expected notSent") }
+        XCTAssertNil(hc.sent)
+    }
+
+    func testFailedCopyAfterWithdrawalDoesNotReopen() throws {
+        let hc = MutateHc { labels in labels["ask.state"] = "withdrawn" }; hc.putFails = true; let (s, _) = try sender(hc)
+        guard case .notSent = s.send(role:"asker", questionId:"qImage0001", text:"This one", attachments:[image]) else { return XCTFail("expected notSent") }
+        XCTAssertFalse(hc.calls.contains(["label","t1","ask.state=open"]))
+        XCTAssertEqual((hc.target["labels"] as? [String: Any])?["ask.state"] as? String, "withdrawn")
+    }
+
+    /// The asker's labels change while the first image is being copied.
+    final class MutateHc: FakeHc {
+        let change: (inout [String: Any]) -> Void
+        init(_ change: @escaping (inout [String: Any]) -> Void) { self.change = change }
+        override func run(_ args: [String], timeout: TimeInterval) -> HcResult {
+            let result = super.run(args, timeout: timeout)
+            if args.first == "put" { var labels = target["labels"] as! [String: Any]; change(&labels); target["labels"] = labels }
+            return result
+        }
+    }
+
     func testTooManyImagesAreRefused() throws {
         let hc = FakeHc(); let (s, _) = try sender(hc)
         let many = (0...AttachmentStore.maxCount).map { Attachment(id:"i\($0)",name:"\($0).png",file:"/d/\($0).png",bytes:1,width:1,height:1) }
