@@ -502,7 +502,10 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                     }
                 }
             } else if let answer = field("text", 2000) {
-                sendAnswer(id: id, asker: asker, role: role, text: answer, client: sender)
+                let ids = body["attachments"] as? [String] ?? []
+                guard ids.count <= AttachmentStore.maxCount, Set(ids).count == ids.count, ids.allSatisfy({ $0.count <= 64 }),
+                      ids.isEmpty || attachmentKey(asker) != nil, !(answer.isEmpty && ids.isEmpty) else { questionResult(id, "refused"); return }
+                sendAnswer(id: id, asker: asker, role: role, text: answer, attachmentIDs: ids, client: sender)
             } else {
                 questionResult(id, "refused")
             }
@@ -649,13 +652,30 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
     }
 
     /// Sends the answer the person typed and submitted in the focused HerdrDesk window; no second confirmation.
-    private func sendAnswer(id: String, asker: Term, role: String, text: String, client: AnswerSender) {
-        guard window.isKeyWindow, NSApp.isActive, checkText(text) == nil, validate(term: asker, questionId: id) == nil,
+    /// Images come from the asker's own attachment tray (the same one its conversation's composer uses) and are
+    /// cleared once the answer is sent.
+    private func sendAnswer(id: String, asker: Term, role: String, text: String, attachmentIDs: [String], client: AnswerSender) {
+        guard window.isKeyWindow, NSApp.isActive, attachmentIDs.isEmpty ? checkText(text) == nil : text.count <= maxAnswerLength,
+              validate(term: asker, questionId: id) == nil,
               environment["HERDRDESK_NO_SEND"] != "1" else { questionResult(id, "refused"); return }
+        let key = attachmentKey(asker)
         commands.async {
+            var files: [Attachment] = []
+            if !attachmentIDs.isEmpty {
+                guard let key, let resolved = self.attachmentQueue.sync(execute: { self.attachmentStore.resolve(role: key, ids: attachmentIDs) }) else {
+                    DispatchQueue.main.async { self.questionResult(id, "refused") }; return
+                }
+                files = resolved
+            }
             let state: String
-            switch client.send(role: role, questionId: id, text: text) {
-            case .sent: state = "sent"
+            switch client.send(role: role, questionId: id, text: text, attachments: files) {
+            case .sent:
+                state = "sent"
+                if let key, !files.isEmpty {
+                    self.modifyAttachments(key: key, address: asker.address, session: asker.session) {
+                        self.attachmentStore.clear(role: key, ids: attachmentIDs)
+                    }
+                }
             case .notSent: state = "notSent"
             case .needsCheck: state = "needsCheck"
             case .refused: state = "refused"

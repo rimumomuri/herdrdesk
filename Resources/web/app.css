@@ -1336,3 +1336,4 @@ details.settings[open] .settings-menu { animation:desk-pop 140ms var(--motion-ea
 .to-bottom[data-unseen=true] { border-color:#6f86b8; color:#cfe0ff }
 .to-bottom[hidden], #chatHistory[hidden] + .to-bottom, #roomFeed[hidden] + .to-bottom { display:none }
 @media(prefers-reduced-motion:reduce) { .to-bottom { animation:none } }
+.question-files{margin:6px 0 2px}.question-files:empty{display:none}.question-attach{display:inline-flex;align-items:center;justify-content:center}.question-attach svg{width:15px;height:15px}

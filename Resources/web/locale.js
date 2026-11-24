@@ -176,7 +176,7 @@ const strings = {
  transfers:['Task handoffs','업무 전달','作業の引き継ぎ'],selection:['Selected terminal','선택한 담당','選択中のターミナル'],
  chat:['Chat','대화','チャット'],terminal:['Terminal','터미널','ターミナル'],assign:['Assign work','작업 전달','作業を依頼'],
  imageInput:['Drop an image here or paste one with Command-V.','이미지를 끌어놓거나 Command-V로 붙여넣으세요.','画像をドロップするか、Command-Vで貼り付けてください。'],
- removeAttachment:['Remove attachment','첨부 제거','添付を削除'],
+ removeAttachment:['Remove attachment','첨부 제거','添付を削除'],attachImage:['Attach an image','이미지 첨부','画像を添付'],
  attachmentFailed:['Could not attach the image. Check its type and size.','이미지를 첨부하지 못했습니다. 형식과 크기를 확인하세요.','画像を添付できませんでした。種類とサイズを確認してください。'],
  attachmentLimit:['Up to 4 images per message.','한 메시지에 이미지 4장까지 첨부할 수 있습니다.','画像は1件につき4枚までです。'],
  attachedImages:['Attached images','첨부 이미지','添付画像'],
