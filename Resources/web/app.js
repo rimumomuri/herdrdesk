@@ -2183,16 +2183,29 @@ function runPalette(id){
     if((row.room&&'room:'+row.room===id||row.direct&&'direct:'+row.direct===id)&&chatPreferences.get(row.key)?.unread)changeChatPreference(row.key,{unread:false});
   if(id.startsWith('room:')){openRoom(id.slice('room:'.length));return;}
   const term=inventory.find(item=>sessionKey(item)===id.slice('direct:'.length));
+  // a lead's chat is folded into its room in the sidebar: reading it clears the room's manual unread mark too
+  const ledRoom=term&&rooms().find(room=>roomLead(room)&&sessionKey(roomLead(room))===sessionKey(term));
+  if(ledRoom&&chatPreferences.get('room:'+ledRoom.id)?.unread)changeChatPreference('room:'+ledRoom.id,{unread:false});
   if(term){openDirectChat(term);render();}
 }
 $('#paletteInput').addEventListener('input',()=>{paletteSelected=0;renderPalette();});
+let paletteComposing=false, paletteComposed=-Infinity;
+$('#paletteInput').addEventListener('compositionstart',()=>{paletteComposing=true;});
+$('#paletteInput').addEventListener('compositionend',()=>{paletteComposing=false;paletteComposed=performance.now();});
 $('#paletteInput').addEventListener('keydown',event=>{
   if(event.isComposing||event.keyCode===229)return;
+  if(event.key==='Enter'){
+    // an input method's Enter that commits text (or its echo right after) must not run the highlighted item
+    const action=enterAction(event,paletteComposing,performance.now()-paletteComposed);
+    event.preventDefault();
+    if(action==='send')runPalette(paletteShown[paletteSelected]?.id);
+    return;
+  }
   if(event.key==='ArrowDown'||event.key==='ArrowUp'){
     event.preventDefault();
     const n=paletteShown.length;if(!n)return;
     paletteSelected=(paletteSelected+(event.key==='ArrowDown'?1:n-1))%n;renderPalette();
-  }else if(event.key==='Enter'){event.preventDefault();runPalette(paletteShown[paletteSelected]?.id);}
+  }
 });
 $('#paletteList').addEventListener('click',event=>runPalette(event.target.closest('[data-palette]')?.dataset.palette));
 $('#paletteDialog').addEventListener('click',event=>{if(event.target===event.currentTarget)$('#paletteDialog').close();});
