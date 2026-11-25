@@ -16,6 +16,7 @@ import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsVa
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText, boardSummaryHTML, BOARD_LABELS } from './task-board.js';
 import { questionFormHTML, questionFilesHTML, keepTyping } from './chat-questions.js';
 import { attentionOf, autoUnread, markSeen, snoozeActive, snoozeUntil, nextUrgent, waitingCount } from './triage.js';
+import { filterPalette, paletteHTML } from './palette.js';
 import { sendBlocked, deferredSaver } from './composer.js';
 import { freshEntries } from './motion.js';
 import { stickyScroll } from './chat-scroll.js';
@@ -2130,9 +2131,90 @@ $('#roomList').addEventListener('click',event=>{
   renderRooms();
 });
 $('#urgentJump').addEventListener('click',openNextUrgent);
+
+// Command palette (Cmd+K): conversations, computers and a few actions, filtered as you type.
+let paletteItems=[], paletteShown=[], paletteSelected=0;
+function buildPaletteItems(){
+  const items=[];
+  // always offered: the jump refreshes its own queue, so a cached count here could only be stale
+  items.push({id:'action:next',kind:'action',label:copy('nextUrgent'),detail:'⌘J'});
+  const current=active();
+  if(current?.address&&current.state==='live')items.push({id:'action:terminal',kind:'action',label:copy('actionTerminal').replace('{name}',current.label||current.address),detail:''});
+  items.push({id:'action:settings',kind:'action',label:copy('actionSettings'),detail:''});
+  // read straight from the current data (not the sidebar's last render), so any page searches what exists now
+  for(const room of rooms())items.push({id:'room:'+room.id,kind:'chat',label:room.title,detail:copy('paletteTeam')});
+  for(const term of inventory.filter(term=>term.program?.agent&&term.state==='live')){
+    const team=chatTeamsBySession.get(sessionKey(term))?.title;
+    items.push({id:'direct:'+sessionKey(term),kind:'chat',label:term.label||term.address,detail:[team,memberStatus(term)].filter(Boolean).join(' · ')});
+  }
+  for(const machine of computerRows(snapshot.tasks?.machines||[],snapshot.machines||[],inventory,workingNow).filter(row=>row.editable))
+    items.push({id:'computer:'+machine.name,kind:'computer',label:machine.label||machine.name,detail:machine.name});
+  return items;
+}
+function renderPalette(){
+  paletteShown=filterPalette(paletteItems,$('#paletteInput').value);
+  paletteSelected=Math.min(paletteSelected,Math.max(0,paletteShown.length-1));
+  $('#paletteList').innerHTML=paletteHTML(paletteShown,paletteSelected,copy,escape);
+  if(paletteShown.length)$('#paletteInput').setAttribute('aria-activedescendant','palette-option-'+paletteSelected);
+  else $('#paletteInput').removeAttribute('aria-activedescendant');
+  $('#paletteEmpty').hidden=paletteShown.length>0;
+  $('#paletteList').querySelector('[aria-selected="true"]')?.scrollIntoView({block:'nearest'});
+}
+function openPalette(){
+  const dialog=$('#paletteDialog');
+  if(document.querySelector('dialog[open]'))return;   // never over another dialog (its choices would land underneath)
+  paletteItems=buildPaletteItems();paletteSelected=0;
+  $('#paletteInput').value='';$('#paletteInput').placeholder=copy('palettePlaceholder');
+  $('#paletteEmpty').textContent=copy('paletteEmpty');dialog.setAttribute('aria-label',copy('palettePlaceholder'));
+  renderPalette();dialog.showModal();$('#paletteInput').focus();
+}
+function runPalette(id){
+  $('#paletteDialog').close();
+  if(!id)return;
+  if(id==='action:next'){openNextUrgent();return;}
+  if(id==='action:terminal'){const term=active();if(term){page='conversations';render();openTerminalDrawer(term);}return;}
+  if(id==='action:settings'){$('.settings').open=true;$('.settings summary').focus();return;}
+  if(id.startsWith('computer:')){
+    computerOpen=id.slice('computer:'.length);computerMessage('');renderComputerSheet(true);$('#computerDialog').showModal();return;
+  }
+  page='conversations';
+  // like a sidebar click, opening a conversation clears its manual unread mark
+  for(const row of sidebarRows.values())
+    if((row.room&&'room:'+row.room===id||row.direct&&'direct:'+row.direct===id)&&chatPreferences.get(row.key)?.unread)changeChatPreference(row.key,{unread:false});
+  if(id.startsWith('room:')){openRoom(id.slice('room:'.length));return;}
+  const term=inventory.find(item=>sessionKey(item)===id.slice('direct:'.length));
+  // a lead's chat is folded into its room in the sidebar: reading it clears the room's manual unread mark too
+  const ledRoom=term&&rooms().find(room=>roomLead(room)&&sessionKey(roomLead(room))===sessionKey(term));
+  if(ledRoom&&chatPreferences.get('room:'+ledRoom.id)?.unread)changeChatPreference('room:'+ledRoom.id,{unread:false});
+  if(term){openDirectChat(term);render();}
+}
+$('#paletteInput').addEventListener('input',()=>{paletteSelected=0;renderPalette();});
+let paletteComposing=false, paletteComposed=-Infinity;
+$('#paletteInput').addEventListener('compositionstart',()=>{paletteComposing=true;});
+$('#paletteInput').addEventListener('compositionend',()=>{paletteComposing=false;paletteComposed=performance.now();});
+$('#paletteInput').addEventListener('keydown',event=>{
+  if(event.isComposing||event.keyCode===229)return;
+  if(event.key==='Enter'){
+    // an input method's Enter that commits text (or its echo right after) must not run the highlighted item
+    const action=enterAction(event,paletteComposing,performance.now()-paletteComposed);
+    event.preventDefault();
+    if(action==='send')runPalette(paletteShown[paletteSelected]?.id);
+    return;
+  }
+  if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+    event.preventDefault();
+    const n=paletteShown.length;if(!n)return;
+    paletteSelected=(paletteSelected+(event.key==='ArrowDown'?1:n-1))%n;renderPalette();
+  }
+});
+$('#paletteList').addEventListener('click',event=>runPalette(event.target.closest('[data-palette]')?.dataset.palette));
+$('#paletteDialog').addEventListener('click',event=>{if(event.target===event.currentTarget)$('#paletteDialog').close();});
+// Escape closes only the palette (the dialog's own cancel), never the panel underneath
+$('#paletteDialog').addEventListener('keydown',event=>{if(event.key==='Escape')event.stopPropagation();});
 document.addEventListener('keydown',event=>{
   if(event.isComposing||event.keyCode===229)return;   // Ctrl/Cmd+J may belong to an input method while composing
   if(event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey&&event.key.toLowerCase()==='j'){event.preventDefault();openNextUrgent();}
+  if(event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey&&event.key.toLowerCase()==='k'){event.preventDefault();openPalette();}
 });
 $('#hiddenChatsToggle').addEventListener('click',()=>{
   showHiddenChats=!showHiddenChats;
