@@ -193,7 +193,7 @@ const chatPreferences=new Map(Object.entries(load(chatPreferencesKey,{})));
 let sidebarRows=new Map(), showHiddenChats=false, contextChat=null, sectionChat=null;
 // Triage: when each conversation was last looked at, snoozed conversations, and what needs the person now.
 const seenKey='ui.seen.v1', snoozeKey='ui.snooze.v1';
-let seenAt=load(seenKey,{}), snoozes=load(snoozeKey,{}), showSnoozed=false, triageRows=[], triageUnread=new Set(), snoozeTimer;
+let seenAt=load(seenKey,{}), snoozes=load(snoozeKey,{}), showSnoozed=false, triageRows=[], triageUnread=new Set(), snoozeTimer, refreshingQueue=false;
 const timeOf=at=>typeof at==='number'?at:Date.parse(at)||0;
 const chatSectionsKey='ui.chatSections.v1';
 let chatSections=load(chatSectionsKey,{order:[],collapsed:[]})||{order:[],collapsed:[]};
@@ -605,7 +605,7 @@ function renderRooms(){
   rows.splice(0,rows.length,...folded.rows);
   // Unread: an agent spoke after the person last looked (never on first sight); looking at a conversation marks it seen.
   // a lead's own chat folds into its room: reading it counts as reading the room
-  const looking=document.hidden||!selectedBeforeFold?null:rows.some(row=>row.key===selectedBeforeFold)?selectedBeforeFold:leadToRoom.get(selectedBeforeFold)||null, now=Date.now();
+  const looking=document.hidden||refreshingQueue||!selectedBeforeFold?null:rows.some(row=>row.key===selectedBeforeFold)?selectedBeforeFold:leadToRoom.get(selectedBeforeFold)||null, now=Date.now();
   const nextSeen=markSeen(seenAt,rows,looking,now);
   if(JSON.stringify(nextSeen)!==JSON.stringify(seenAt)){seenAt=nextSeen;save(seenKey,seenAt);}
   for(const row of rows)if(!row.selected&&autoUnread(row,seenAt))row.unread=true;
@@ -671,7 +671,8 @@ function renderUrgent(){
   button.title=copy('nextUrgent')+' (⌘J)';
 }
 function openNextUrgent(){
-  if(page!=='conversations'){page='conversations';render();}   // the queue is only current while the sidebar renders
+  // the queue is only current while the sidebar renders; that refresh must not mark the old selection seen
+  if(page!=='conversations'){page='conversations';refreshingQueue=true;try{render();}finally{refreshingQueue=false;}}
   const current=triageRows.find(row=>row.selected)?.key||null;
   const key=nextUrgent(triageRows,triageUnread,current), row=key&&sidebarRows.get(key);
   if(!row)return;
@@ -2130,7 +2131,8 @@ $('#roomList').addEventListener('click',event=>{
 });
 $('#urgentJump').addEventListener('click',openNextUrgent);
 document.addEventListener('keydown',event=>{
-  if((event.metaKey||event.ctrlKey)&&!event.shiftKey&&!event.altKey&&event.key.toLowerCase()==='j'){event.preventDefault();openNextUrgent();}
+  if(event.isComposing||event.keyCode===229)return;   // Ctrl/Cmd+J may belong to an input method while composing
+  if(event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey&&event.key.toLowerCase()==='j'){event.preventDefault();openNextUrgent();}
 });
 $('#hiddenChatsToggle').addEventListener('click',()=>{
   showHiddenChats=!showHiddenChats;
