@@ -2195,6 +2195,8 @@ $('#paletteInput').addEventListener('keydown',event=>{
 });
 $('#paletteList').addEventListener('click',event=>runPalette(event.target.closest('[data-palette]')?.dataset.palette));
 $('#paletteDialog').addEventListener('click',event=>{if(event.target===event.currentTarget)$('#paletteDialog').close();});
+// Escape closes only the palette (the dialog's own cancel), never the panel underneath
+$('#paletteDialog').addEventListener('keydown',event=>{if(event.key==='Escape')event.stopPropagation();});
 document.addEventListener('keydown',event=>{
   if(event.isComposing||event.keyCode===229)return;   // Ctrl/Cmd+J may belong to an input method while composing
   if(event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey&&event.key.toLowerCase()==='j'){event.preventDefault();openNextUrgent();}
