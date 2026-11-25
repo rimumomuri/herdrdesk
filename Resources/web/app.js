@@ -15,6 +15,7 @@ import { agentTrouble, machineTrouble } from './trouble.js';
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest, mainMachineLabel } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText, boardSummaryHTML, BOARD_LABELS } from './task-board.js';
 import { questionFormHTML, questionFilesHTML, keepTyping } from './chat-questions.js';
+import { attentionOf, autoUnread, markSeen, snoozeActive, snoozeUntil, nextUrgent, waitingCount } from './triage.js';
 import { sendBlocked, deferredSaver } from './composer.js';
 import { freshEntries } from './motion.js';
 import { stickyScroll } from './chat-scroll.js';
@@ -190,6 +191,10 @@ const chatDragType='application/x-herdrdesk-chat';
 const chatPreferencesKey='ui.chatPreferences.v1';
 const chatPreferences=new Map(Object.entries(load(chatPreferencesKey,{})));
 let sidebarRows=new Map(), showHiddenChats=false, contextChat=null, sectionChat=null;
+// Triage: when each conversation was last looked at, snoozed conversations, and what needs the person now.
+const seenKey='ui.seen.v1', snoozeKey='ui.snooze.v1';
+let seenAt=load(seenKey,{}), snoozes=load(snoozeKey,{}), showSnoozed=false, triageRows=[], triageUnread=new Set(), snoozeTimer, refreshingQueue=false;
+const timeOf=at=>typeof at==='number'?at:Date.parse(at)||0;
 const chatSectionsKey='ui.chatSections.v1';
 let chatSections=load(chatSectionsKey,{order:[],collapsed:[]})||{order:[],collapsed:[]};
 let sidebarGroups=new Map(), sectionMode='move', contextSection=null, draggedSection=null, listMarker=null;
@@ -551,9 +556,13 @@ function renderRooms(){
     const feed=roomFeedRows(room), roster=roomRoster(room);
     const latest=feed.findLast(row=>row.kind!=='progress'&&row.body);
     const status=room.members.find(workingNow);
-    const pending=roomQuestions(room).length;
+    const roomAsks=roomQuestions(room), pending=roomAsks.length;
     const unread=Boolean(roomUnread.get(room.id)?.size);
+    const lastAgent=feed.findLast(row=>row.author!==copy('you')&&row.kind!=='progress'&&row.body);
+    const live=room.members.filter(member=>member.state==='live');
     return {
+      lastAgentAt:timeOf(lastAgent?.at), trouble:live.some(member=>agentTrouble(member)==='login')?'login':null, questions:roomAsks.map(q=>q.id),
+      blocked:live.some(member=>member.status==='blocked'),
       key:'room:'+room.id, room:room.id, selected:room.id===selected?.id,
       title:room.title, icon:teamEmblem(room,roster), at:feed.at(-1)?.at||0,
       preview:[countsLabel(room.id),latest?snippet(latest.author+' · '+latest.body):''].filter(Boolean).join(' · '),
@@ -568,8 +577,10 @@ function renderRooms(){
     const team=chatTeamsBySession.get(sessionKey(term))?.title;
     const title=term.label;
     const shortTitle=shortRoleTitle(title,team);
-    const pending=roomQuestions(null,term).length;
+    const asks=roomQuestions(null,term), pending=asks.length;
+    const lastAgent=entries.findLast(entry=>entry.from&&entry.state!=='progress');
     rows.push({
+      lastAgentAt:timeOf(lastAgent?.at), trouble:agentTrouble(term), blocked:term.state==='live'&&term.status==='blocked', questions:asks.map(q=>q.id),
       key:'direct:'+(role&&roleCounts.get(role)===1?role:sessionKey(term)),
       direct:sessionKey(term), selected:!selected&&sessionKey(term)===sessionKey(active()),
       title, shortTitle, team:team===title?'':team,
@@ -588,14 +599,33 @@ function renderRooms(){
     const section=chatPreferences.get(leadKey)?.section;
     if(section&&!chatPreferences.get(roomKey)?.section)changeChatPreference(roomKey,{section});
   }
+  const selectedBeforeFold=rows.find(row=>row.selected)?.key||null;
   const folded=foldLeadChats(rows,[...pinnedChats],leadToRoom);
   if(folded.changed){pinnedChats.clear();for(const key of folded.pins)pinnedChats.add(key);save(pinKey,[...pinnedChats]);}
   rows.splice(0,rows.length,...folded.rows);
+  // Unread: an agent spoke after the person last looked (never on first sight); looking at a conversation marks it seen.
+  // a lead's own chat folds into its room: reading it counts as reading the room
+  const looking=document.hidden||refreshingQueue||!selectedBeforeFold?null:rows.some(row=>row.key===selectedBeforeFold)?selectedBeforeFold:leadToRoom.get(selectedBeforeFold)||null, now=Date.now();
+  const nextSeen=markSeen(seenAt,rows,looking,now);
+  if(JSON.stringify(nextSeen)!==JSON.stringify(seenAt)){seenAt=nextSeen;save(seenKey,seenAt);}
+  for(const row of rows)if(!row.selected&&autoUnread(row,seenAt))row.unread=true;
+  // Snoozed rows drop to "Later" until their time, new agent activity or something that needs the person.
+  const snoozed=new Set(rows.filter(row=>snoozeActive(snoozes[row.key],row,now)).map(row=>row.key));
+  // expire only what was evaluated (or whose time is up): the empty list before the first snapshot cancels nothing
+  const stale=Object.keys(snoozes).filter(key=>now>=snoozes[key].until||rows.some(row=>row.key===key)&&!snoozed.has(key));
+  if(stale.length){for(const key of stale)delete snoozes[key];save(snoozeKey,snoozes);}
+  // wake the sidebar when the next snooze is due, even if nothing else changes
+  const due=Math.min(...Object.values(snoozes).map(entry=>entry.until));
+  clearTimeout(snoozeTimer);
+  if(Number.isFinite(due))snoozeTimer=setTimeout(renderRooms,Math.min(Math.max(due-now+50,1000),2**31-1));
   sidebarRows=new Map(rows.map(row=>[row.key,row]));
   setPanel('#computerStrip',computerStripHTML(computerRows(snapshot.tasks?.machines||[],snapshot.machines||[],inventory,workingNow),copy,escape));
   renderComputerSheet();
-  const shown=rows.filter(row=>!chatHidden(row,chatPreferences.get(row.key)));
-  const pinned=[...pinnedChats].reverse().map(key=>sidebarRows.get(key)).filter(row=>row&&!chatHidden(row,chatPreferences.get(row.key)));
+  const shown=rows.filter(row=>!chatHidden(row,chatPreferences.get(row.key))&&!snoozed.has(row.key));
+  const pinned=[...pinnedChats].reverse().map(key=>sidebarRows.get(key)).filter(row=>row&&!chatHidden(row,chatPreferences.get(row.key))&&!snoozed.has(row.key));
+  triageRows=rows.filter(row=>!chatHidden(row,chatPreferences.get(row.key))&&!snoozed.has(row.key));
+  triageUnread=new Set(triageRows.filter(row=>row.unread||chatPreferences.get(row.key)?.unread).map(row=>row.key));
+  renderUrgent();
   const recent=shown.filter(row=>!pinnedChats.has(row.key));
   const hidden=rows.filter(row=>chatHidden(row,chatPreferences.get(row.key)));
   if(!hidden.length)showHiddenChats=false;
@@ -615,7 +645,12 @@ function renderRooms(){
     +(rows.length?'<button type="button" class="add-section" data-add-section>'+escape('+ '+copy('addSection'))+'</button>':'');
   const hiddenHTML=showHiddenChats&&hidden.length?sidebarHeading(copy('hiddenChats'))
     +hidden.map(row=>conversationItem(row,false)).join(''):'';
-  const listUpdated=setPanel('#roomList',listHTML+hiddenHTML
+  const later=rows.filter(row=>snoozed.has(row.key)&&!chatHidden(row,chatPreferences.get(row.key)));
+  if(!later.length)showSnoozed=false;
+  const laterHTML=later.length?'<button type="button" class="snoozed-toggle" data-snoozed-toggle aria-expanded="'+showSnoozed+'">'
+    +'<span class="section-chevron" aria-hidden="true"></span>'+escape(copy('snoozedChats'))+' <small>'+later.length+'</small></button>'
+    +(showSnoozed?later.map(row=>conversationItem(row,false)).join(''):''):'';
+  const listUpdated=setPanel('#roomList',listHTML+laterHTML+hiddenHTML
     ||(!rows.length?'<p class="muted">'+copy('noDirectChats')+'</p>':''));
   if((shelfUpdated||listUpdated)&&focus){
     const button=[...$('#roomNav').querySelectorAll('button')].find(button=>
@@ -625,6 +660,25 @@ function renderRooms(){
   }
   $('#roomTools').hidden=false;
   $('#roomBack').hidden=Boolean(selected)||!all.some(room=>room.id===memberTeam);
+}
+
+/** "Waiting N" above the conversations; clicking it (or ⌘J) opens the next conversation that needs the person. */
+function renderUrgent(){
+  const n=waitingCount(triageRows,triageUnread), button=$('#urgentJump');
+  button.hidden=!n;
+  const label=copy('waitingCount').replace('{n}',String(n));
+  if(button.dataset.label!==label){button.dataset.label=label;button.innerHTML='<b>'+escape(label)+'</b><kbd>⌘J</kbd>';}
+  button.title=copy('nextUrgent')+' (⌘J)';
+}
+function openNextUrgent(){
+  // the queue is only current while the sidebar renders; that refresh must not mark the old selection seen
+  if(page!=='conversations'){page='conversations';refreshingQueue=true;try{render();}finally{refreshingQueue=false;}}
+  const current=triageRows.find(row=>row.selected)?.key||null;
+  const key=nextUrgent(triageRows,triageUnread,current), row=key&&sidebarRows.get(key);
+  if(!row)return;
+  if(chatPreferences.get(key)?.unread)changeChatPreference(key,{unread:false});
+  if(row.room)openRoom(row.room);
+  else{openDirectChat(inventory.find(term=>sessionKey(term)===row.direct));render();}
 }
 
 function sectionHeading(group){
@@ -1820,6 +1874,7 @@ function openChatContext(key,x,y){
     +sections.filter(name=>name!==prefs.section).map(name=>item('section',name,'↳',name)).join('')
     +(prefs.section?item('section',copy('unassignedChats'),'↳'):'')
     +item('unread',copy(prefs.unread||row.unread?'markRead':'markUnread'),'◉')
+    +(snoozes[key]?item('unsnooze',copy('unsnooze'),'↺'):item('snoozeHour',copy('snoozeHour'),'◔')+item('snoozeMorning',copy('snoozeMorning'),'☾'))
     +item('copy',copy('copyChatID'),'▣')
     +item('hide',copy(chatHidden(row,prefs)?'restoreChat':'hideChat'),chatHidden(row,prefs)?'◈':'◇');
   menu.setAttribute('aria-label',row.title);
@@ -2059,11 +2114,25 @@ $('#chatContextMenu').addEventListener('click',event=>{
   if(action==='section')changeChatPreference(key,{section:item.dataset.section});
   if(action==='hide')changeChatPreference(key,{hidden:!chatHidden(row,prefs)});
   if(action==='unread'){
+    const read=prefs.unread||row.unread;
     if(row.room&&row.unread)roomUnread.delete(row.room);
-    changeChatPreference(key,{unread:!(prefs.unread||row.unread)});
+    if(read){seenAt={...seenAt,[key]:Math.max(Date.now(),row.lastAgentAt||0)};save(seenKey,seenAt);}
+    changeChatPreference(key,{unread:!read});
   }
   if(action==='copy'){post({type:'copyChatID',value:key});return;}
+  if(action==='snoozeHour'||action==='snoozeMorning'){snoozes[key]={until:snoozeUntil(action==='snoozeHour'?'hour':'morning',Date.now()),at:Math.max(Date.now(),row.lastAgentAt||0)};save(snoozeKey,snoozes);}
+  if(action==='unsnooze'){delete snoozes[key];save(snoozeKey,snoozes);}
   renderRooms();
+});
+$('#roomList').addEventListener('click',event=>{
+  if(!event.target.closest('[data-snoozed-toggle]'))return;
+  showSnoozed=!showSnoozed;
+  renderRooms();
+});
+$('#urgentJump').addEventListener('click',openNextUrgent);
+document.addEventListener('keydown',event=>{
+  if(event.isComposing||event.keyCode===229)return;   // Ctrl/Cmd+J may belong to an input method while composing
+  if(event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey&&event.key.toLowerCase()==='j'){event.preventDefault();openNextUrgent();}
 });
 $('#hiddenChatsToggle').addEventListener('click',()=>{
   showHiddenChats=!showHiddenChats;
