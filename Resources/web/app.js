@@ -193,7 +193,7 @@ const chatPreferences=new Map(Object.entries(load(chatPreferencesKey,{})));
 let sidebarRows=new Map(), showHiddenChats=false, contextChat=null, sectionChat=null;
 // Triage: when each conversation was last looked at, snoozed conversations, and what needs the person now.
 const seenKey='ui.seen.v1', snoozeKey='ui.snooze.v1';
-let seenAt=load(seenKey,{}), snoozes=load(snoozeKey,{}), showSnoozed=false, triageRows=[], triageUnread=new Set();
+let seenAt=load(seenKey,{}), snoozes=load(snoozeKey,{}), showSnoozed=false, triageRows=[], triageUnread=new Set(), snoozeTimer;
 const timeOf=at=>typeof at==='number'?at:Date.parse(at)||0;
 const chatSectionsKey='ui.chatSections.v1';
 let chatSections=load(chatSectionsKey,{order:[],collapsed:[]})||{order:[],collapsed:[]};
@@ -612,6 +612,10 @@ function renderRooms(){
   // expire only what was evaluated (or whose time is up): the empty list before the first snapshot cancels nothing
   const stale=Object.keys(snoozes).filter(key=>now>=snoozes[key].until||rows.some(row=>row.key===key)&&!snoozed.has(key));
   if(stale.length){for(const key of stale)delete snoozes[key];save(snoozeKey,snoozes);}
+  // wake the sidebar when the next snooze is due, even if nothing else changes
+  const due=Math.min(...Object.values(snoozes).map(entry=>entry.until));
+  clearTimeout(snoozeTimer);
+  if(Number.isFinite(due))snoozeTimer=setTimeout(renderRooms,Math.min(Math.max(due-now+50,1000),2**31-1));
   sidebarRows=new Map(rows.map(row=>[row.key,row]));
   setPanel('#computerStrip',computerStripHTML(computerRows(snapshot.tasks?.machines||[],snapshot.machines||[],inventory,workingNow),copy,escape));
   renderComputerSheet();
@@ -665,10 +669,11 @@ function renderUrgent(){
   button.title=copy('nextUrgent')+' (⌘J)';
 }
 function openNextUrgent(){
+  if(page!=='conversations'){page='conversations';render();}   // the queue is only current while the sidebar renders
   const current=triageRows.find(row=>row.selected)?.key||null;
   const key=nextUrgent(triageRows,triageUnread,current), row=key&&sidebarRows.get(key);
   if(!row)return;
-  page='conversations';
+  if(chatPreferences.get(key)?.unread)changeChatPreference(key,{unread:false});
   if(row.room)openRoom(row.room);
   else{openDirectChat(inventory.find(term=>sessionKey(term)===row.direct));render();}
 }
