@@ -189,3 +189,15 @@ test('a registered question carries its one-line recommendation, if any', async 
   assert.equal(registeredQuestions([term(undefined)], {})[0].recommend, '');
   assert.equal(registeredQuestions([term('a\nb')], {})[0].recommend, '', 'multi-line text is not a recommendation');
 });
+
+test('merged conversation records are computed once per pair of input lists', async () => {
+  const {memoLast} = await import('../Resources/web/model.js');
+  let calls = 0;
+  const merge = memoLast((a, b) => { calls++; return [...a, ...b]; });
+  const replies = [{id: 1}], live = [{id: 2}];
+  const first = merge(replies, live);
+  assert.equal(merge(replies, live), first, 'same lists: the same result, not recomputed');
+  assert.equal(calls, 1);
+  merge([{id: 1}], live);
+  assert.equal(calls, 2, 'a new list (a new snapshot) recomputes');
+});

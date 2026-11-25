@@ -28,6 +28,8 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
     private var handoffSignature = ""
     private var handoffTimer: Timer?
     private var pushedHandoffSignature: String?
+    private var pushDiff = PushDiff()
+    private var resultsStamp: String?
     private var lineageCache: (stamp: Date, edges: [HandoffLineage])?
     private let handoffWrites = DispatchQueue(label: "herdrdesk.handoffs", qos: .utility)
     /// Team card board from `herdr-task board --json`, re-read only when the ledger folder changes.
@@ -255,11 +257,11 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
     private func push() {
         guard ready else { return }
         refreshPublishedMessages()
-        call("window.desk.update(payload)", ["payload": ["terms": terms, "machines": machines, "spaces": spaces, "systemSounds": systemSounds,
+        call("window.desk.update(payload)", ["payload": pushDiff.trim(["terms": terms, "machines": machines, "spaces": spaces, "systemSounds": systemSounds,
                                                          "connection": connection, "isolated": isolated, "ledger": questionLedger(),
                                                          "preferredLocale": Locale.preferredLanguages.first ?? "en",
                                                          "replies": replies, "teamMessages": teamMessages, "liveMessages": liveMessages + liveReplyArchive.entries, "liveTurns": liveTurns, "automaticChat": automaticChat, "archiveRoles": archiveRoles,
-                                                         "legacyProfile": DeskPaths.retainsLegacyProfile, "configuredTeams": configuredTeams, "lineage":lineageStore.publicJSON()].merging(handoffPayload()) { $1 }.merging(taskPayload()) { $1 }])
+                                                         "legacyProfile": DeskPaths.retainsLegacyProfile, "configuredTeams": configuredTeams, "lineage":lineageStore.publicJSON()].merging(handoffPayload()) { $1 }.merging(taskPayload()) { $1 })])
     }
 
     // MARK: handoffs
@@ -406,6 +408,7 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
             ready = true
             pushedHandoffSignature = nil   // a fresh page has no handoff snapshot yet
             pushedTaskVersion = -1
+            pushDiff.reset()               // ... nor any of the large parts
             stopWatch()
             push()
         case "copyChatID":
@@ -627,6 +630,10 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
             term.labels["result.latest"].map { term.address + ":" + $0 + ":" + (term.labels["result.revision"] ?? "") }
         }.sorted()
         replySignature = signature
+        // Re-read the records only when a role folder changed (files are written by rename) or a label points at a new one.
+        let stamp = resultsFolderStamp() + "|" + signature.joined(separator: ",")
+        if stamp == resultsStamp { return }
+        resultsStamp = stamp
         let records = ResultStore(root: ResultStore.defaultRoot()).load().filter { !$0.withdrawn }
         let personal = records.filter { ["reply", "message", "progress"].contains($0.kind) || ($0.kind == "agent-handoff" && !$0.recipient.isEmpty) }
         let readable = DeskPaths.retainsLegacyProfile ? personal : Array(personal.prefix(160))
@@ -636,6 +643,15 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
         }
         replies = readable.map(asDictionary)
         teamMessages = records.filter { ["team-message", "progress"].contains($0.kind) && !$0.team.isEmpty }.prefix(300).map(asDictionary)
+    }
+
+    private func resultsFolderStamp() -> String {
+        let root = ResultStore.defaultRoot(), fm = FileManager.default
+        guard let roles = try? fm.contentsOfDirectory(atPath: root.path) else { return "none" }
+        return roles.sorted().map { role -> String in
+            let date = (try? fm.attributesOfItem(atPath: root.appendingPathComponent(role).path)[.modificationDate] as? Date) ?? .distantPast
+            return role + "@" + String(date.timeIntervalSince1970)
+        }.joined(separator: ";")
     }
 
     private func questionLedger() -> [String: String] {

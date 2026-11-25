@@ -20,7 +20,7 @@ import { filterPalette, paletteHTML } from './palette.js';
 import { sendBlocked, deferredSaver } from './composer.js';
 import { freshEntries } from './motion.js';
 import { stickyScroll } from './chat-scroll.js';
-import { makeInventory, makeTeamDirectory, listedGroup, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
+import { makeInventory, makeTeamDirectory, listedGroup, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus, memoLast } from './model.js';
 import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
 import { enterAction } from './keys.js';
 import { createTerminalView } from './terminal-view.js';
@@ -754,8 +754,11 @@ function openRoom(id, showMembers=false) {
   render();
 }
 
+// One render asked for this hundreds of times (every agent row, every image in the log): merge once per snapshot.
+const EMPTY_RECORDS=[];
+const mergedRecords=memoLast(mergeConversationRecords);
 function conversationRecords() {
-  return mergeConversationRecords(snapshot.replies||[], snapshot.liveMessages||[]);
+  return mergedRecords(snapshot.replies||EMPTY_RECORDS, snapshot.liveMessages||EMPTY_RECORDS);
 }
 
 function roomFeedRows(room) {
@@ -2564,6 +2567,9 @@ window.desk={
   update(payload){
     if(!('handoffs' in payload)&&snapshot?.handoffs)payload.handoffs=snapshot.handoffs;   // sent only when it changes
     if(!('tasks' in payload)&&snapshot?.tasks)payload.tasks=snapshot.tasks;
+    // large parts are sent only when they change; keep the previous ones (the same objects, so derived results are reused)
+    for(const key of ['replies','teamMessages','liveMessages','liveTurns','lineage','configuredTeams','spaces','systemSounds','archiveRoles','machines','ledger'])
+      if(!(key in payload)&&snapshot&&key in snapshot)payload[key]=snapshot[key];
     snapshot=payload;
     $('#automaticChat').checked=payload.automaticChat!==false;
     if(!localeChosen&&!systemLocaleApplied&&payload.preferredLocale){

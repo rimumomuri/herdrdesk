@@ -226,3 +226,12 @@ export function mergeConversationRecords(published = [], live = []) {
   });
   return [...kept, ...live.map(item => aliases.has(item.id) ? {...item, publicationID: aliases.get(item.id)} : item)];
 }
+
+/** fn(a, b), recomputed only when either argument is a different object than last time (snapshots replace their lists). */
+export function memoLast(fn) {
+  let lastA, lastB, last, primed = false;
+  return (a, b) => {
+    if (!primed || a !== lastA || b !== lastB) { last = fn(a, b); lastA = a; lastB = b; primed = true; }
+    return last;
+  };
+}
