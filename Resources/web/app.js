@@ -1671,22 +1671,20 @@ $('.controls').addEventListener('click',event=>{
   if(action)post({type:action==='configure'?'chooseCore':'refresh'});
 });
 /** Enter-to-send for text fields under `root` (fieldOf picks the field from an event target, or null).
- * One Enter sends: in Korean the press that commits the last syllable also sends, and when WebKit reports that press twice
- * (composing keydown, then the commit echo) the second report within SEND_DEDUPE_MS is ignored. */
+ * One Enter sends: in Korean the press that commits the last syllable also sends. When WebKit reports that one press twice
+ * (composing keydown, then the commit echo), only the echo of that same commit, in that field, is ignored. */
 function enterSends(root,fieldOf,send){
-  const state={composing:false,ended:-Infinity,text:'',pending:null,pendingAt:0,lastSend:-Infinity};
-  const fire=field=>{
-    if(performance.now()-state.lastSend<SEND_DEDUPE_MS)return;
-    state.lastSend=performance.now();
-    send(field);
-  };
+  const state={composing:false,ended:-Infinity,text:'',pending:null,pendingAt:0,sentCommit:null};
   root.addEventListener('compositionstart',event=>{if(fieldOf(event.target)){state.composing=true;state.text='';}});
   root.addEventListener('compositionupdate',event=>{if(fieldOf(event.target))state.text=event.data||'';});
   root.addEventListener('compositionend',event=>{
     const field=fieldOf(event.target);
     if(!field)return;
     state.composing=false;state.ended=performance.now();state.text=event.data||state.text;
-    if(state.pending===field&&performance.now()-state.pendingAt<1000){state.pending=null;setTimeout(()=>fire(field),0);}
+    if(state.pending===field&&performance.now()-state.pendingAt<1000){
+      state.pending=null;state.sentCommit={field,at:state.ended};
+      setTimeout(()=>send(field),0);
+    }
   });
   root.addEventListener('keydown',event=>{
     const field=fieldOf(event.target);
@@ -1696,7 +1694,10 @@ function enterSends(root,fieldOf,send){
     if(action==='other')return;
     state.pending=null;
     if(action==='swallow'||action==='send')event.preventDefault();
-    if(action==='send')fire(field);
+    // the echo of a commit that already sent (same field, same commit) is that same press
+    const echo=state.sentCommit&&state.sentCommit.field===field&&state.sentCommit.at===state.ended&&performance.now()-state.ended<SEND_DEDUPE_MS;
+    if(action==='send'&&!echo)send(field);
+    if(action==='send')state.sentCommit=null;
   });
 }
 enterSends($('#draft'),target=>target.id==='draft'?target:null,()=>{if(!$('#send').disabled)$('#composer').requestSubmit($('#send'));});

@@ -18,5 +18,5 @@ export function enterAction(e, composing, msSinceCompositionEnd, text = '') {
   return 'send';
 }
 
-/** One Enter can reach both the composing keydown and the commit echo: a second send within this window is the same press. */
+/** How long after a commit that already sent its echo Enter is still treated as the same press. */
 export const SEND_DEDUPE_MS = 400;
