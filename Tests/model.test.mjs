@@ -179,3 +179,13 @@ test('a group is listed when it is a configured team or has at least one agent',
   assert.equal(listedGroup([{program:{agent:false}}, {program:{agent:true}}], false), true);
   assert.equal(listedGroup([], true), true);
 });
+
+test('a registered question carries its one-line recommendation, if any', async () => {
+  const {registeredQuestions} = await import('../Resources/web/model.js');
+  const term = recommend => ({address:'t1', state:'live', session:'1:2', program:{agent:true}, status:'idle',
+    labels:{'recovery.role':'lead', 'ask.id':'q20261125000000abcdef', 'ask.text':'Which?', 'ask.session':'1:2', ...(recommend === undefined ? {} : {'ask.recommend':recommend})}});
+  assert.equal(registeredQuestions([term('A안')], {})[0].recommend, 'A안');
+  assert.equal(registeredQuestions([term('')], {})[0].recommend, '');
+  assert.equal(registeredQuestions([term(undefined)], {})[0].recommend, '');
+  assert.equal(registeredQuestions([term('a\nb')], {})[0].recommend, '', 'multi-line text is not a recommendation');
+});

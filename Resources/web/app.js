@@ -2425,9 +2425,12 @@ panel.addEventListener('keydown',event=>{
 });
 panel.addEventListener('submit',event=>{
   event.preventDefault();
-  const form=event.target,id=form.dataset.question,text=form.elements.answer?.value.trim()||'';
+  const form=event.target,id=form.dataset.question;
   const asker=askerFor(form), key=asker?sessionKey(asker):'';
   const attachments=asker?filesFor(asker).map(file=>file.id):[];
+  // an empty box with no images sends the asker's recommended answer, which the card shows
+  const typed=form.elements.answer?.value.trim()||'', recommend=questions().find(q=>q.id===id)?.recommend||'';
+  const text=typed||(attachments.length?'':recommend);
   if((!text&&!attachments.length)||questionSending.has(id)||(key&&pendingFiles(key)))return;
   questionSending.add(id);
   post({type:'answer',id,text,attachments});

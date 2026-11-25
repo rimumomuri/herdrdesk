@@ -62,3 +62,10 @@ test('the image list is empty and the picker is off while images are still being
 test('a question that cannot be answered has no image picker', () => {
   assert.doesNotMatch(questionFormHTML(q, {label:'x', canAnswer:false, feedback:'sending', files:[{id:'a',name:'a',thumbnail:''}]}, copy, escape), /data-question-attach|data-question-files/);
 });
+
+test('a recommended answer shows on the card and in the empty field\'s hint', () => {
+  const html = questionFormHTML({...q, recommend: 'A안<'}, {label:'x', canAnswer:true, feedback:'answerNeeded'}, key => ({recommended:'추천', answerHintRecommend:'Enter로 추천대로 답하기: {answer}'})[key] || copy(key), escape);
+  assert.match(html, /<p class="question-recommend"[^>]*>추천 · <b>A안&lt;<\/b><\/p>/);
+  assert.match(html, /placeholder="Enter로 추천대로 답하기: A안&lt;"/);
+  assert.match(html, /data-recommend="A안&lt;"/);
+});
