@@ -22,7 +22,7 @@ import { freshEntries } from './motion.js';
 import { stickyScroll } from './chat-scroll.js';
 import { makeInventory, makeTeamDirectory, listedGroup, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus } from './model.js';
 import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
-import { enterAction } from './keys.js';
+import { enterAction, SEND_DEDUPE_MS } from './keys.js';
 import { createTerminalView } from './terminal-view.js';
 
 const $ = selector => document.querySelector(selector);
@@ -1670,14 +1670,36 @@ $('.controls').addEventListener('click',event=>{
   const action=event.target.closest('[data-action]')?.dataset.action;
   if(action)post({type:action==='configure'?'chooseCore':'refresh'});
 });
-let composing=false, lastComposition=-Infinity;
-$('#draft').addEventListener('compositionstart',()=>{composing=true});
-$('#draft').addEventListener('compositionend',()=>{composing=false;lastComposition=performance.now()});
-$('#draft').addEventListener('keydown',event=>{
-  const action=enterAction(event,composing,performance.now()-lastComposition);
-  if(action==='swallow'||action==='send')event.preventDefault();
-  if(action==='send'&&!$('#send').disabled)$('#composer').requestSubmit($('#send'));
-});
+/** Enter-to-send for text fields under `root` (fieldOf picks the field from an event target, or null).
+ * One Enter sends: in Korean the press that commits the last syllable also sends, and when WebKit reports that press twice
+ * (composing keydown, then the commit echo) the second report within SEND_DEDUPE_MS is ignored. */
+function enterSends(root,fieldOf,send){
+  const state={composing:false,ended:-Infinity,text:'',pending:null,pendingAt:0,lastSend:-Infinity};
+  const fire=field=>{
+    if(performance.now()-state.lastSend<SEND_DEDUPE_MS)return;
+    state.lastSend=performance.now();
+    send(field);
+  };
+  root.addEventListener('compositionstart',event=>{if(fieldOf(event.target)){state.composing=true;state.text='';}});
+  root.addEventListener('compositionupdate',event=>{if(fieldOf(event.target))state.text=event.data||'';});
+  root.addEventListener('compositionend',event=>{
+    const field=fieldOf(event.target);
+    if(!field)return;
+    state.composing=false;state.ended=performance.now();state.text=event.data||state.text;
+    if(state.pending===field&&performance.now()-state.pendingAt<1000){state.pending=null;setTimeout(()=>fire(field),0);}
+  });
+  root.addEventListener('keydown',event=>{
+    const field=fieldOf(event.target);
+    if(!field)return;
+    const action=enterAction(event,state.composing,performance.now()-state.ended,state.text);
+    if(action==='sendAfterCommit'){state.pending=field;state.pendingAt=performance.now();return;}
+    if(action==='other')return;
+    state.pending=null;
+    if(action==='swallow'||action==='send')event.preventDefault();
+    if(action==='send')fire(field);
+  });
+}
+enterSends($('#draft'),target=>target.id==='draft'?target:null,()=>{if(!$('#send').disabled)$('#composer').requestSubmit($('#send'));});
 // Per keystroke only the draft and the send button change; the chat history is not rebuilt.
 $('#draft').addEventListener('input',event=>{
   const term=active();
@@ -2189,18 +2211,10 @@ function runPalette(id){
   if(term){openDirectChat(term);render();}
 }
 $('#paletteInput').addEventListener('input',()=>{paletteSelected=0;renderPalette();});
-let paletteComposing=false, paletteComposed=-Infinity;
-$('#paletteInput').addEventListener('compositionstart',()=>{paletteComposing=true;});
-$('#paletteInput').addEventListener('compositionend',()=>{paletteComposing=false;paletteComposed=performance.now();});
+// Enter runs the highlighted item (one press in Korean; never on a Japanese conversion confirm)
+enterSends($('#paletteInput'),target=>target.id==='paletteInput'?target:null,()=>runPalette(paletteShown[paletteSelected]?.id));
 $('#paletteInput').addEventListener('keydown',event=>{
-  if(event.isComposing||event.keyCode===229)return;
-  if(event.key==='Enter'){
-    // an input method's Enter that commits text (or its echo right after) must not run the highlighted item
-    const action=enterAction(event,paletteComposing,performance.now()-paletteComposed);
-    event.preventDefault();
-    if(action==='send')runPalette(paletteShown[paletteSelected]?.id);
-    return;
-  }
+  if(event.isComposing||event.keyCode===229||event.key==='Enter')return;
   if(event.key==='ArrowDown'||event.key==='ArrowUp'){
     event.preventDefault();
     const n=paletteShown.length;if(!n)return;
@@ -2412,17 +2426,8 @@ panel.addEventListener('paste',event=>{
   const asker=askerFor(form);
   if(asker)addAttachments(files,asker).then(refreshQuestionFiles);
 });
-// Enter sends the answer like the composer (Shift+Enter: new line; never while an input method is composing).
-let answerComposing=false, answerComposed=-Infinity;
-panel.addEventListener('compositionstart',()=>{answerComposing=true});
-panel.addEventListener('compositionend',()=>{answerComposing=false;answerComposed=performance.now()});
-panel.addEventListener('keydown',event=>{
-  const form=event.target.closest?.('[data-question]');
-  if(!form||!event.target.matches('textarea'))return;
-  const action=enterAction(event,answerComposing,performance.now()-answerComposed);
-  if(action==='swallow'||action==='send')event.preventDefault();
-  if(action==='send')form.requestSubmit();
-});
+// Enter sends the answer like the composer (Shift+Enter: new line; one Enter in Korean too).
+enterSends(panel,target=>target.matches?.('[data-question] textarea')?target:null,field=>field.closest('form')?.requestSubmit());
 panel.addEventListener('submit',event=>{
   event.preventDefault();
   const form=event.target,id=form.dataset.question;
