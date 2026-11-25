@@ -2135,7 +2135,8 @@ $('#urgentJump').addEventListener('click',openNextUrgent);
 // Command palette (Cmd+K): conversations, computers and a few actions, filtered as you type.
 let paletteItems=[], paletteShown=[], paletteSelected=0;
 function buildPaletteItems(){
-  if(page!=='conversations'){page='conversations';refreshingQueue=true;try{render();}finally{refreshingQueue=false;}}
+  // the sidebar rows are only current on Conversations: refresh them there, then put the page back (nothing chosen yet)
+  if(page!=='conversations'){const previous=page;page='conversations';refreshingQueue=true;try{render();}finally{refreshingQueue=false;page=previous;render();}}
   const items=[];
   if(waitingCount(triageRows,triageUnread))items.push({id:'action:next',kind:'action',label:copy('nextUrgent'),detail:copy('waitingCount').replace('{n}',String(waitingCount(triageRows,triageUnread)))+' · ⌘J'});
   const current=active();
@@ -2151,6 +2152,8 @@ function renderPalette(){
   paletteShown=filterPalette(paletteItems,$('#paletteInput').value);
   paletteSelected=Math.min(paletteSelected,Math.max(0,paletteShown.length-1));
   $('#paletteList').innerHTML=paletteHTML(paletteShown,paletteSelected,copy,escape);
+  if(paletteShown.length)$('#paletteInput').setAttribute('aria-activedescendant','palette-option-'+paletteSelected);
+  else $('#paletteInput').removeAttribute('aria-activedescendant');
   $('#paletteEmpty').hidden=paletteShown.length>0;
   $('#paletteList').querySelector('[aria-selected="true"]')?.scrollIntoView({block:'nearest'});
 }

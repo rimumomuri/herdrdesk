@@ -18,7 +18,7 @@ export function filterPalette(items, query, limit = 12) {
 
 /** The result list; `selected` is the highlighted index. */
 export function paletteHTML(list, selected, copy, escape) {
-  return list.map((item, index) => '<li role="option" aria-selected="' + (index === selected) + '" data-palette="' + escape(item.id) + '">'
+  return list.map((item, index) => '<li role="option" id="palette-option-' + index + '" aria-selected="' + (index === selected) + '" data-palette="' + escape(item.id) + '">'
     + '<span class="palette-kind">' + escape(copy('palette_' + item.kind)) + '</span><b>' + escape(item.label) + '</b>'
     + (item.detail ? '<small>' + escape(item.detail) + '</small>' : '') + '</li>').join('');
 }

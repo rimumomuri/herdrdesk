@@ -31,6 +31,6 @@ test('the list caps at 12 and marks the selected row', () => {
   assert.equal(filterPalette(many, 'agent').length, 12);
   const escape = text => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
   const html = paletteHTML([{id: 'a<', kind: 'chat', label: 'A<b', detail: 'x'}], 0, key => key, escape);
-  assert.match(html, /role="option" aria-selected="true" data-palette="a&lt;"/);
+  assert.match(html, /role="option" id="palette-option-0" aria-selected="true" data-palette="a&lt;"/);
   assert.match(html, /A&lt;b/);
 });
