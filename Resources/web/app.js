@@ -2136,7 +2136,8 @@ $('#urgentJump').addEventListener('click',openNextUrgent);
 let paletteItems=[], paletteShown=[], paletteSelected=0;
 function buildPaletteItems(){
   const items=[];
-  if(waitingCount(triageRows,triageUnread))items.push({id:'action:next',kind:'action',label:copy('nextUrgent'),detail:copy('waitingCount').replace('{n}',String(waitingCount(triageRows,triageUnread)))+' · ⌘J'});
+  // always offered: the jump refreshes its own queue, so a cached count here could only be stale
+  items.push({id:'action:next',kind:'action',label:copy('nextUrgent'),detail:'⌘J'});
   const current=active();
   if(current?.address&&current.state==='live')items.push({id:'action:terminal',kind:'action',label:copy('actionTerminal').replace('{name}',current.label||current.address),detail:''});
   items.push({id:'action:settings',kind:'action',label:copy('actionSettings'),detail:''});
@@ -2161,7 +2162,7 @@ function renderPalette(){
 }
 function openPalette(){
   const dialog=$('#paletteDialog');
-  if(dialog.open)return;
+  if(document.querySelector('dialog[open]'))return;   // never over another dialog (its choices would land underneath)
   paletteItems=buildPaletteItems();paletteSelected=0;
   $('#paletteInput').value='';$('#paletteInput').placeholder=copy('palettePlaceholder');
   $('#paletteEmpty').textContent=copy('paletteEmpty');dialog.setAttribute('aria-label',copy('palettePlaceholder'));
