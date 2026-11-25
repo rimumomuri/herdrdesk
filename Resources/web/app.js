@@ -2135,14 +2135,17 @@ $('#urgentJump').addEventListener('click',openNextUrgent);
 // Command palette (Cmd+K): conversations, computers and a few actions, filtered as you type.
 let paletteItems=[], paletteShown=[], paletteSelected=0;
 function buildPaletteItems(){
-  // off Conversations the rows are those of its last render: opening search must not change any view or unread state
   const items=[];
   if(waitingCount(triageRows,triageUnread))items.push({id:'action:next',kind:'action',label:copy('nextUrgent'),detail:copy('waitingCount').replace('{n}',String(waitingCount(triageRows,triageUnread)))+' · ⌘J'});
   const current=active();
   if(current?.address&&current.state==='live')items.push({id:'action:terminal',kind:'action',label:copy('actionTerminal').replace('{name}',current.label||current.address),detail:''});
   items.push({id:'action:settings',kind:'action',label:copy('actionSettings'),detail:''});
-  for(const row of sidebarRows.values())if(!chatHidden(row,chatPreferences.get(row.key)))
-    items.push({id:'chat:'+row.key,kind:'chat',label:row.shortTitle||row.title,detail:[row.team,row.state].filter(Boolean).join(' · ')});
+  // read straight from the current data (not the sidebar's last render), so any page searches what exists now
+  for(const room of rooms())items.push({id:'room:'+room.id,kind:'chat',label:room.title,detail:copy('paletteTeam')});
+  for(const term of inventory.filter(term=>term.program?.agent&&term.state==='live')){
+    const team=chatTeamsBySession.get(sessionKey(term))?.title;
+    items.push({id:'direct:'+sessionKey(term),kind:'chat',label:term.label||term.address,detail:[team,memberStatus(term)].filter(Boolean).join(' · ')});
+  }
   for(const machine of computerRows(snapshot.tasks?.machines||[],snapshot.machines||[],inventory,workingNow).filter(row=>row.editable))
     items.push({id:'computer:'+machine.name,kind:'computer',label:machine.label||machine.name,detail:machine.name});
   return items;
@@ -2168,17 +2171,18 @@ function runPalette(id){
   $('#paletteDialog').close();
   if(!id)return;
   if(id==='action:next'){openNextUrgent();return;}
-  if(id==='action:terminal'){const term=active();if(term)openTerminalDrawer(term);return;}
+  if(id==='action:terminal'){const term=active();if(term){page='conversations';render();openTerminalDrawer(term);}return;}
   if(id==='action:settings'){$('.settings').open=true;$('.settings summary').focus();return;}
   if(id.startsWith('computer:')){
     computerOpen=id.slice('computer:'.length);computerMessage('');renderComputerSheet(true);$('#computerDialog').showModal();return;
   }
-  const key=id.slice('chat:'.length), row=sidebarRows.get(key);
-  if(!row)return;
-  if(chatPreferences.get(key)?.unread)changeChatPreference(key,{unread:false});
   page='conversations';
-  if(row.room)openRoom(row.room);
-  else{openDirectChat(inventory.find(term=>sessionKey(term)===row.direct));render();}
+  // like a sidebar click, opening a conversation clears its manual unread mark
+  for(const row of sidebarRows.values())
+    if((row.room&&'room:'+row.room===id||row.direct&&'direct:'+row.direct===id)&&chatPreferences.get(row.key)?.unread)changeChatPreference(row.key,{unread:false});
+  if(id.startsWith('room:')){openRoom(id.slice('room:'.length));return;}
+  const term=inventory.find(item=>sessionKey(item)===id.slice('direct:'.length));
+  if(term){openDirectChat(term);render();}
 }
 $('#paletteInput').addEventListener('input',()=>{paletteSelected=0;renderPalette();});
 $('#paletteInput').addEventListener('keydown',event=>{
