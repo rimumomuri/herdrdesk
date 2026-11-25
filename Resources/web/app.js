@@ -609,14 +609,15 @@ function renderRooms(){
   for(const row of rows)if(!row.selected&&autoUnread(row,seenAt))row.unread=true;
   // Snoozed rows drop to "Later" until their time, new agent activity or something that needs the person.
   const snoozed=new Set(rows.filter(row=>snoozeActive(snoozes[row.key],row,now)).map(row=>row.key));
-  const stale=Object.keys(snoozes).filter(key=>!snoozed.has(key));
+  // expire only what was evaluated (or whose time is up): the empty list before the first snapshot cancels nothing
+  const stale=Object.keys(snoozes).filter(key=>now>=snoozes[key].until||rows.some(row=>row.key===key)&&!snoozed.has(key));
   if(stale.length){for(const key of stale)delete snoozes[key];save(snoozeKey,snoozes);}
   sidebarRows=new Map(rows.map(row=>[row.key,row]));
   setPanel('#computerStrip',computerStripHTML(computerRows(snapshot.tasks?.machines||[],snapshot.machines||[],inventory,workingNow),copy,escape));
   renderComputerSheet();
   const shown=rows.filter(row=>!chatHidden(row,chatPreferences.get(row.key))&&!snoozed.has(row.key));
   const pinned=[...pinnedChats].reverse().map(key=>sidebarRows.get(key)).filter(row=>row&&!chatHidden(row,chatPreferences.get(row.key))&&!snoozed.has(row.key));
-  triageRows=rows.filter(row=>!chatHidden(row,chatPreferences.get(row.key)));
+  triageRows=rows.filter(row=>!chatHidden(row,chatPreferences.get(row.key))&&!snoozed.has(row.key));
   triageUnread=new Set(triageRows.filter(row=>row.unread||chatPreferences.get(row.key)?.unread).map(row=>row.key));
   renderUrgent();
   const recent=shown.filter(row=>!pinnedChats.has(row.key));
@@ -2105,8 +2106,10 @@ $('#chatContextMenu').addEventListener('click',event=>{
   if(action==='section')changeChatPreference(key,{section:item.dataset.section});
   if(action==='hide')changeChatPreference(key,{hidden:!chatHidden(row,prefs)});
   if(action==='unread'){
+    const read=prefs.unread||row.unread;
     if(row.room&&row.unread)roomUnread.delete(row.room);
-    changeChatPreference(key,{unread:!(prefs.unread||row.unread)});
+    if(read){seenAt={...seenAt,[key]:Math.max(Date.now(),row.lastAgentAt||0)};save(seenKey,seenAt);}
+    changeChatPreference(key,{unread:!read});
   }
   if(action==='copy'){post({type:'copyChatID',value:key});return;}
   if(action==='snoozeHour'||action==='snoozeMorning'){snoozes[key]={until:snoozeUntil(action==='snoozeHour'?'hour':'morning',Date.now()),at:Math.max(Date.now(),row.lastAgentAt||0)};save(snoozeKey,snoozes);}
