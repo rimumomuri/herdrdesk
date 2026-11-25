@@ -2135,8 +2135,7 @@ $('#urgentJump').addEventListener('click',openNextUrgent);
 // Command palette (Cmd+K): conversations, computers and a few actions, filtered as you type.
 let paletteItems=[], paletteShown=[], paletteSelected=0;
 function buildPaletteItems(){
-  // the sidebar rows are only current on Conversations: refresh them there, then put the page back (nothing chosen yet)
-  if(page!=='conversations'){const previous=page;page='conversations';refreshingQueue=true;try{render();}finally{refreshingQueue=false;page=previous;render();}}
+  // off Conversations the rows are those of its last render: opening search must not change any view or unread state
   const items=[];
   if(waitingCount(triageRows,triageUnread))items.push({id:'action:next',kind:'action',label:copy('nextUrgent'),detail:copy('waitingCount').replace('{n}',String(waitingCount(triageRows,triageUnread)))+' · ⌘J'});
   const current=active();
