@@ -1337,3 +1337,5 @@ details.settings[open] .settings-menu { animation:desk-pop 140ms var(--motion-ea
 .to-bottom[hidden], #chatHistory[hidden] + .to-bottom, #roomFeed[hidden] + .to-bottom { display:none }
 @media(prefers-reduced-motion:reduce) { .to-bottom { animation:none } }
 .question-files{margin:6px 0 2px}.question-files:empty{display:none}.question-attach{display:inline-flex;align-items:center;justify-content:center}.question-attach svg{width:15px;height:15px}
+.urgent-jump{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin:0 0 8px;padding:6px 10px;border-radius:8px;border:1px solid #4a3d22;background:#2a2417;color:#f0c26b;font-size:12px}.urgent-jump kbd{font:11px var(--mono,ui-monospace,monospace);color:#b9975a}.urgent-jump:hover{background:#342b1a}
+.snoozed-toggle{display:flex;align-items:center;gap:6px;width:100%;margin:10px 0 4px;padding:4px 6px;background:none;border:0;color:var(--muted,#8a8e96);font-size:12px;text-align:left}.snoozed-toggle[aria-expanded="false"] .section-chevron{transform:rotate(-45deg)}

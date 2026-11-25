@@ -75,7 +75,7 @@ const strings = {
  noDirectChats:['No members yet.','표시할 담당자가 없어요.','表示できる担当者がいません。'],
  unreadStatus:['Unread','읽지 않음','未読'],
  markUnread:['Mark unread','읽지 않음으로 표시','未読にする'],
- markRead:['Mark read','읽음으로 표시','既読にする'],
+ markRead:['Mark read','읽음으로 표시','既読にする'],snoozeHour:['Later · in 1 hour','나중에 보기 · 1시간 뒤','後で · 1時間後'],snoozeMorning:['Later · tomorrow 9:00','나중에 보기 · 아침 9시','後で · 朝9時'],unsnooze:['Bring back now','지금 다시 보기','今すぐ戻す'],snoozedChats:['Later','나중에','後で'],waitingCount:['{n} waiting','기다림 {n}','待機 {n}'],nextUrgent:['Next that needs you','다음 급한 곳','次に対応する会話'],
  newChatSection:['Move to new section','새 섹션으로 이동','新しいセクションに移動'],
  chatSectionName:['Section name','섹션 이름','セクション名'],
  moveChatSection:['Move','이동','移動'],
