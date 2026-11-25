@@ -75,7 +75,7 @@ const strings = {
  noDirectChats:['No members yet.','표시할 담당자가 없어요.','表示できる担当者がいません。'],
  unreadStatus:['Unread','읽지 않음','未読'],
  markUnread:['Mark unread','읽지 않음으로 표시','未読にする'],
- markRead:['Mark read','읽음으로 표시','既読にする'],snoozeHour:['Later · in 1 hour','나중에 보기 · 1시간 뒤','後で · 1時間後'],snoozeMorning:['Later · tomorrow 9:00','나중에 보기 · 아침 9시','後で · 朝9時'],unsnooze:['Bring back now','지금 다시 보기','今すぐ戻す'],snoozedChats:['Later','나중에','後で'],waitingCount:['{n} waiting','기다림 {n}','待機 {n}'],nextUrgent:['Next that needs you','다음 급한 곳','次に対応する会話'],
+ markRead:['Mark read','읽음으로 표시','既読にする'],palettePlaceholder:['Jump to a conversation, computer or action…','대화·컴퓨터·동작 이름으로 이동…','会話・コンピューター・操作へ移動…'],paletteEmpty:['Nothing matches','맞는 항목이 없어요','一致するものがありません'],palette_chat:['Chat','대화','会話'],palette_computer:['Computer','컴퓨터','コンピューター'],palette_action:['Action','동작','操作'],actionTerminal:['Open terminal · {name}','터미널 열기 · {name}','ターミナルを開く · {name}'],actionSettings:['Open settings','설정 열기','設定を開く'],snoozeHour:['Later · in 1 hour','나중에 보기 · 1시간 뒤','後で · 1時間後'],snoozeMorning:['Later · tomorrow 9:00','나중에 보기 · 아침 9시','後で · 朝9時'],unsnooze:['Bring back now','지금 다시 보기','今すぐ戻す'],snoozedChats:['Later','나중에','後で'],waitingCount:['{n} waiting','기다림 {n}','待機 {n}'],nextUrgent:['Next that needs you','다음 급한 곳','次に対応する会話'],
  newChatSection:['Move to new section','새 섹션으로 이동','新しいセクションに移動'],
  chatSectionName:['Section name','섹션 이름','セクション名'],
  moveChatSection:['Move','이동','移動'],

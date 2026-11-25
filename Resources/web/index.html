@@ -86,6 +86,11 @@
  </div>
 </main>
 <div id="chatContextMenu" class="chat-context-menu" role="menu" hidden></div>
+<dialog id="paletteDialog" class="palette-dialog" aria-label="">
+ <input id="paletteInput" type="search" autocomplete="off" spellcheck="false" role="combobox" aria-controls="paletteList" aria-expanded="true">
+ <ul id="paletteList" role="listbox"></ul>
+ <p id="paletteEmpty" class="muted" hidden></p>
+</dialog>
 <dialog id="computerDialog" class="computer-dialog" aria-labelledby="computerTitle">
  <div id="computerSheet"></div>
  <p id="computerMessage" class="computer-status" role="status"></p>

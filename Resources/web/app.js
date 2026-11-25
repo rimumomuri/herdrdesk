@@ -16,6 +16,7 @@ import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsVa
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText, boardSummaryHTML, BOARD_LABELS } from './task-board.js';
 import { questionFormHTML, questionFilesHTML, keepTyping } from './chat-questions.js';
 import { attentionOf, autoUnread, markSeen, snoozeActive, snoozeUntil, nextUrgent, waitingCount } from './triage.js';
+import { filterPalette, paletteHTML } from './palette.js';
 import { sendBlocked, deferredSaver } from './composer.js';
 import { freshEntries } from './motion.js';
 import { stickyScroll } from './chat-scroll.js';
@@ -2130,9 +2131,68 @@ $('#roomList').addEventListener('click',event=>{
   renderRooms();
 });
 $('#urgentJump').addEventListener('click',openNextUrgent);
+
+// Command palette (Cmd+K): conversations, computers and a few actions, filtered as you type.
+let paletteItems=[], paletteShown=[], paletteSelected=0;
+function buildPaletteItems(){
+  if(page!=='conversations'){page='conversations';refreshingQueue=true;try{render();}finally{refreshingQueue=false;}}
+  const items=[];
+  if(waitingCount(triageRows,triageUnread))items.push({id:'action:next',kind:'action',label:copy('nextUrgent'),detail:copy('waitingCount').replace('{n}',String(waitingCount(triageRows,triageUnread)))+' · ⌘J'});
+  const current=active();
+  if(current?.address&&current.state==='live')items.push({id:'action:terminal',kind:'action',label:copy('actionTerminal').replace('{name}',current.label||current.address),detail:''});
+  items.push({id:'action:settings',kind:'action',label:copy('actionSettings'),detail:''});
+  for(const row of sidebarRows.values())if(!chatHidden(row,chatPreferences.get(row.key)))
+    items.push({id:'chat:'+row.key,kind:'chat',label:row.shortTitle||row.title,detail:[row.team,row.state].filter(Boolean).join(' · ')});
+  for(const machine of computerRows(snapshot.tasks?.machines||[],snapshot.machines||[],inventory,workingNow).filter(row=>row.editable))
+    items.push({id:'computer:'+machine.name,kind:'computer',label:machine.label||machine.name,detail:machine.name});
+  return items;
+}
+function renderPalette(){
+  paletteShown=filterPalette(paletteItems,$('#paletteInput').value);
+  paletteSelected=Math.min(paletteSelected,Math.max(0,paletteShown.length-1));
+  $('#paletteList').innerHTML=paletteHTML(paletteShown,paletteSelected,copy,escape);
+  $('#paletteEmpty').hidden=paletteShown.length>0;
+  $('#paletteList').querySelector('[aria-selected="true"]')?.scrollIntoView({block:'nearest'});
+}
+function openPalette(){
+  const dialog=$('#paletteDialog');
+  if(dialog.open)return;
+  paletteItems=buildPaletteItems();paletteSelected=0;
+  $('#paletteInput').value='';$('#paletteInput').placeholder=copy('palettePlaceholder');
+  $('#paletteEmpty').textContent=copy('paletteEmpty');dialog.setAttribute('aria-label',copy('palettePlaceholder'));
+  renderPalette();dialog.showModal();$('#paletteInput').focus();
+}
+function runPalette(id){
+  $('#paletteDialog').close();
+  if(!id)return;
+  if(id==='action:next'){openNextUrgent();return;}
+  if(id==='action:terminal'){const term=active();if(term)openTerminalDrawer(term);return;}
+  if(id==='action:settings'){$('.settings').open=true;$('.settings summary').focus();return;}
+  if(id.startsWith('computer:')){
+    computerOpen=id.slice('computer:'.length);computerMessage('');renderComputerSheet(true);$('#computerDialog').showModal();return;
+  }
+  const key=id.slice('chat:'.length), row=sidebarRows.get(key);
+  if(!row)return;
+  if(chatPreferences.get(key)?.unread)changeChatPreference(key,{unread:false});
+  page='conversations';
+  if(row.room)openRoom(row.room);
+  else{openDirectChat(inventory.find(term=>sessionKey(term)===row.direct));render();}
+}
+$('#paletteInput').addEventListener('input',()=>{paletteSelected=0;renderPalette();});
+$('#paletteInput').addEventListener('keydown',event=>{
+  if(event.isComposing||event.keyCode===229)return;
+  if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+    event.preventDefault();
+    const n=paletteShown.length;if(!n)return;
+    paletteSelected=(paletteSelected+(event.key==='ArrowDown'?1:n-1))%n;renderPalette();
+  }else if(event.key==='Enter'){event.preventDefault();runPalette(paletteShown[paletteSelected]?.id);}
+});
+$('#paletteList').addEventListener('click',event=>runPalette(event.target.closest('[data-palette]')?.dataset.palette));
+$('#paletteDialog').addEventListener('click',event=>{if(event.target===event.currentTarget)$('#paletteDialog').close();});
 document.addEventListener('keydown',event=>{
   if(event.isComposing||event.keyCode===229)return;   // Ctrl/Cmd+J may belong to an input method while composing
   if(event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey&&event.key.toLowerCase()==='j'){event.preventDefault();openNextUrgent();}
+  if(event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey&&event.key.toLowerCase()==='k'){event.preventDefault();openPalette();}
 });
 $('#hiddenChatsToggle').addEventListener('click',()=>{
   showHiddenChats=!showHiddenChats;
