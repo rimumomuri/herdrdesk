@@ -1954,8 +1954,13 @@ function finishChatDrag(){
   draggedSection=null;
   pinDropHint.hidden=true;
   clearPinPreview();
+  for(const preview of document.querySelectorAll('.pin-drag-preview'))preview.remove();
   renderRooms();
 }
+// WebKit can skip dragend (a drag cancelled outside the window). The sidebar does not redraw during a drag, so a lost
+// dragend froze it: the next click opened a conversation while the old one stayed highlighted. A pointer press can only
+// come after a drag has ended, so it closes any drag still marked open.
+document.addEventListener('pointerdown',()=>{if(draggedChat||draggedSection!==null)finishChatDrag();},true);
 roomNav.addEventListener('dragstart',event=>{
   const head=event.target.closest('[data-section-head][draggable=true]');
   if(head&&event.dataTransfer){
