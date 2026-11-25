@@ -21,7 +21,7 @@ export function autoUnread(row, seen) {
 export function markSeen(seen, rows, lookingAt, now) {
   const next = { ...seen };
   for (const row of rows) if (next[row.key] === undefined) next[row.key] = row.lastAgentAt || 0;
-  if (lookingAt) next[lookingAt] = Math.max(now, next[lookingAt] ?? 0);
+  if (lookingAt) next[lookingAt] = Math.max(now, next[lookingAt] ?? 0, rows.find(row => row.key === lookingAt)?.lastAgentAt || 0);
   return next;
 }
 

@@ -599,11 +599,13 @@ function renderRooms(){
     const section=chatPreferences.get(leadKey)?.section;
     if(section&&!chatPreferences.get(roomKey)?.section)changeChatPreference(roomKey,{section});
   }
+  const selectedBeforeFold=rows.find(row=>row.selected)?.key||null;
   const folded=foldLeadChats(rows,[...pinnedChats],leadToRoom);
   if(folded.changed){pinnedChats.clear();for(const key of folded.pins)pinnedChats.add(key);save(pinKey,[...pinnedChats]);}
   rows.splice(0,rows.length,...folded.rows);
   // Unread: an agent spoke after the person last looked (never on first sight); looking at a conversation marks it seen.
-  const looking=document.hidden?null:rows.find(row=>row.selected)?.key||null, now=Date.now();
+  // a lead's own chat folds into its room: reading it counts as reading the room
+  const looking=document.hidden||!selectedBeforeFold?null:rows.some(row=>row.key===selectedBeforeFold)?selectedBeforeFold:leadToRoom.get(selectedBeforeFold)||null, now=Date.now();
   const nextSeen=markSeen(seenAt,rows,looking,now);
   if(JSON.stringify(nextSeen)!==JSON.stringify(seenAt)){seenAt=nextSeen;save(seenKey,seenAt);}
   for(const row of rows)if(!row.selected&&autoUnread(row,seenAt))row.unread=true;

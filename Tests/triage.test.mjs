@@ -24,6 +24,7 @@ test('marking seen records the newest agent message, and first sightings start a
   const seen = markSeen({}, [row('a', {lastAgentAt: 300}), row('b', {lastAgentAt: 900})], 'b', 1000);
   assert.deepEqual(seen, {a: 300, b: 1000});
   assert.deepEqual(markSeen(seen, [row('a', {lastAgentAt: 800})], null, 2000), {a: 300, b: 1000}, 'nothing new marked without looking');
+  assert.equal(markSeen({}, [row('c', {lastAgentAt: 9000})], 'c', 1000).c, 9000, 'an agent clock ahead of ours still counts as seen');
 });
 
 test('a snoozed conversation stays down until its time, new agent activity, or something that needs the person', () => {
