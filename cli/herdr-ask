@@ -1,7 +1,7 @@
 #!/usr/bin/python3 -I
 """herdr-ask: a team lead explicitly registers ONE question for the person, on its own terminal.
 
-  herdr-ask open --text "Question" [--choice A --choice B ...] [--ttl-hours 6] [--replace] [--approval-role ROLE]
+  herdr-ask open --text "Question" [--choice A --choice B ...] [--recommend A] [--ttl-hours 6] [--replace] [--approval-role ROLE]
   herdr-ask approval <id> --approval-role ROLE   # point your CURRENT question at the terminal awaiting approval
   herdr-ask approval <id> --clear
   herdr-ask ack <id>        # the lead confirms it received the person's answer
@@ -12,6 +12,8 @@ Only ask.* labels on the caller's own terminal ($HC_TERMINAL_ID) are written. A 
 report is not a question; nothing here reads conversations or answers on anyone's behalf.
 --approval-role only records WHICH registered role (one live AI, bound to its current session)
 the person may open from the question card. It never approves, sends keys or runs anything.
+--recommend is the answer the asker suggests: the card shows it, and the person can accept it with Enter
+on an empty answer box. It is only a suggestion; nothing is sent until the person sends.
 """
 import argparse, json, os, secrets, shutil, subprocess, sys
 from datetime import datetime, timedelta, timezone
@@ -72,7 +74,7 @@ def main():
     sub = p.add_subparsers(dest='cmd', required=True)
     o = sub.add_parser('open'); o.add_argument('--text', required=True); o.add_argument('--choice', action='append', default=[])
     o.add_argument('--ttl-hours', type=float, default=6); o.add_argument('--replace', action='store_true')
-    o.add_argument('--approval-role')
+    o.add_argument('--approval-role'); o.add_argument('--recommend')
     v = sub.add_parser('approval'); v.add_argument('id'); g = v.add_mutually_exclusive_group(required=True)
     g.add_argument('--approval-role'); g.add_argument('--clear', action='store_true')
     a = sub.add_parser('ack'); a.add_argument('id')
@@ -93,13 +95,14 @@ def main():
         choices = [one_line(c, 40, '--choice') for c in args.choice]
         if len(choices) > 5:
             raise SystemExit('at most 5 choices')
+        recommend = one_line(args.recommend, 200, '--recommend') if args.recommend is not None else ''
         link = approval_labels(args.approval_role, d) if args.approval_role else ['ask.approval_role=', 'ask.approval_session=']
         qid = 'q' + now().strftime('%Y%m%d%H%M%S') + secrets.token_hex(3)
         t = now()
         hc('label', addr, f'ask.id={qid}', f'ask.text={text}', f'ask.choices={json.dumps(choices, ensure_ascii=False)}',
            f'ask.created={t.isoformat()}', f'ask.expires={(t + timedelta(hours=args.ttl_hours)).isoformat()}',
            f'ask.session={d.get("created_ms")}:{d.get("pid")}', 'ask.state=open',
-           'ask.answered=', 'ask.sent_turn=', 'ask.acked=', *link)
+           'ask.answered=', 'ask.sent_turn=', 'ask.acked=', f'ask.recommend={recommend}', *link)
         print(json.dumps({'id': qid, 'state': 'open'})); return
     if args.id != cur_id:
         raise SystemExit(f'no such current question (current: {cur_id})')

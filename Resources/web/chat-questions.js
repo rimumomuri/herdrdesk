@@ -14,8 +14,11 @@ export function questionFilesHTML(files, busy, copy, escape) {
 /** view: {label, canAnswer, feedback, draft, approvalLabel, live, files, filesKey, attachBusy}. approvalLabel is set only while the
  * approval terminal exists. files are the asker's attached images (its conversation's tray), sent with the answer. */
 export function questionFormHTML(q, view, copy, escape) {
+  const rec = q.recommend || '';
+  const hint = rec ? copy('answerHintRecommend').replace('{answer}', () => rec) : copy('answerHint');
   const answer = view.canAnswer
-    ? '<textarea name="answer" aria-label="' + copy('answerHint') + '" placeholder="' + copy('answerHint') + '" maxlength="2000" rows="2">'
+    ? (rec ? '<p class="question-recommend" data-recommend="' + escape(rec) + '">' + escape(copy('recommended')) + ' · <b>' + escape(rec) + '</b></p>' : '')
+      + '<textarea name="answer" aria-label="' + escape(hint) + '" placeholder="' + escape(hint) + '" maxlength="2000" rows="2">'
       + escape(view.draft || '') + '</textarea>'
       + '<div class="attachment-list question-files" data-question-files="' + escape(view.filesKey || '') + '">'
       + questionFilesHTML(view.files, view.attachBusy, copy, escape) + '</div><div class="controls">'

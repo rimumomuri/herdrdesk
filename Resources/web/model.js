@@ -47,7 +47,8 @@ export function registeredQuestions(terms, ledger, now = Date.now()) {
     const target = possibleTargets.length===1&&possibleTargets[0].session===session ? possibleTargets[0] : null;
     let choices=[];
     try { const value=JSON.parse(label['ask.choices'] || '[]'); if(Array.isArray(value))choices=value.filter(x=>typeof x==='string').slice(0,5); } catch {}
-    return [{id, at:recordTime(id), address:term.address, ask:label['ask.text'], choices, state:state==='acked'?'questionAck':
+    const recommend=typeof label['ask.recommend']==='string'&&label['ask.recommend'].length<=200&&!/[\r\n\0]/.test(label['ask.recommend'])?label['ask.recommend'].trim():'';
+    return [{id, at:recordTime(id), address:term.address, ask:label['ask.text'], choices, recommend, state:state==='acked'?'questionAck':
       saved==='needs_check'||saved==='sending'?'needsCheck':saved==='sent'||saved==='resolved_sent'||state==='sent'?'sent':'answerNeeded',
       answerable:state==='open'&&!blocked&&!['needs_check','sending','sent','resolved_sent'].includes(saved),
       approval:role&&session&&['open','sending','needs-check','sent'].includes(state) ? {role, address:target?.address || null} : null}];
