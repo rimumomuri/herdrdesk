@@ -110,7 +110,7 @@ public final class HandoffBook {
         // Books saved before `answeredAt` existed: a reply card from the receiver means it was answered.
         for i in self.edges.indices where self.edges[i].answeredAt == nil {
             let e = self.edges[i]
-            if let reply = cards.last(where: { $0.id.hasPrefix("c:\(e.id):") && $0.kind == "reply" && $0.from.same(e.to) }) { self.edges[i].answeredAt = reply.at }
+            if let reply = cards.last(where: { $0.id.hasPrefix("c:\(e.id):") && $0.kind == "reply" && $0.from.same(e.to) && $0.at > (e.reopenedAt ?? -.infinity) }) { self.edges[i].answeredAt = reply.at }
         }
     }
 
@@ -153,6 +153,8 @@ public final class HandoffBook {
             _ = addCard(edges[i], at: m.at, kind: "reply", from: m.from, to: m.to, body: body)
             return
         }
+        // A new handoff between the same two supersedes an older "keep going?" candidate.
+        for j in edges.indices where edges[j].followUpAt != nil && edges[j].from.same(m.from) && edges[j].to.same(m.to) { edges[j].followUpAt = nil }
         let edge = HandoffEdge(id: "h:\(m.from.address):\(m.to.address):\(Int(m.at))", from: m.from, to: m.to,
                                openedAt: m.at, updatedAt: m.at, closedAt: nil, state: "open", signal: "transcript",
                                summary: body, workedSinceOpen: false, pendingReplyAt: nil, pendingCardId: nil,
