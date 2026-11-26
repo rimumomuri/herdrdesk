@@ -34,7 +34,7 @@ export function markdownDocumentHTML(text, renderInline, escapeText, base = '') 
   let para = [], quote = [], list = null;
   const flushPara = () => { if (para.length) { out.push('<p>' + inline(para.join('\n')) + '</p>'); para = []; } };
   const flushQuote = () => { if (quote.length) { out.push('<blockquote>' + markdownDocumentHTML(quote.join('\n'), renderInline, escapeText, base) + '</blockquote>'); quote = []; } };
-  const flushList = () => { if (list) { out.push('<' + list.tag + '>' + list.items.join('') + '</' + list.tag + '>'); list = null; } };
+  const flushList = () => { if (list) { out.push('<' + list.tag + (list.start > 1 ? ' start="' + list.start + '"' : '') + '>' + list.items.join('') + '</' + list.tag + '>'); list = null; } };
   const flush = () => { flushPara(); flushQuote(); flushList(); };
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -50,7 +50,7 @@ export function markdownDocumentHTML(text, renderInline, escapeText, base = '') 
       out.push('<pre><code>' + escapeText(code.join('\n')) + '</code></pre>');
       continue;
     }
-    if (!line.trim()) { flush(); continue; }
+    if (!line.trim()) { flushPara(); flushQuote(); continue; }
     const quoted = line.match(/^ {0,3}> ?(.*)$/);
     if (quoted) { flushPara(); flushList(); quote.push(quoted[1]); continue; }
     flushQuote();
@@ -73,7 +73,7 @@ export function markdownDocumentHTML(text, renderInline, escapeText, base = '') 
       flushPara();
       const tag = item[2] ? 'ul' : 'ol';
       if (list && list.tag !== tag && item[1].length === 0) flushList();
-      if (!list) list = { tag, items: [] };
+      if (!list) list = { tag, items: [], start: item[3] ? Number(item[3]) : 1 };
       const depth = Math.min(3, Math.floor(item[1].length / 2));
       const body = item[4].replace(/^\[([ xX])\][ \t]+/, (_, mark) => (mark === ' ' ? '☐ ' : '☑ '));
       list.items.push('<li' + (depth ? ' class="md-indent-' + depth + '"' : '') + '>' + inline(body) + '</li>');

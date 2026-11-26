@@ -54,3 +54,8 @@ test('wrapped, titled and parenthesised relative links become real shortcuts', a
   const out = markdownDocumentHTML('[a](<docs/my plan.md>) [b](docs/plan.md "Plan") [c](docs/plan(v2).md)', render, esc, '/Users/me/p');
   assert.equal(out, '<p>' + JSON.stringify(['/Users/me/p/docs/my plan.md', '/Users/me/p/docs/plan.md', '/Users/me/p/docs/plan(v2).md']) + '</p>');
 });
+
+test('an ordered list stays one list across blank lines and keeps its first number', () => {
+  assert.equal(html('1. First\n\n2. Second\n\n3. Third'), '<ol><li>First</li><li>Second</li><li>Third</li></ol>');
+  assert.equal(html('3. Third\n4. Fourth\n\nAfter'), '<ol start="3"><li>Third</li><li>Fourth</li></ol><p>After</p>');
+});
