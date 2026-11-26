@@ -50,6 +50,7 @@ test('a light runs along the ring when motion is on, faster while working, never
   assert.match(calm, /<animateMotion dur="3.6s"/);
   assert.match(leadFaceHTML({ engine: 'codex', motion: true, working: true }), /<animateMotion dur="1.3s"/);
   assert.doesNotMatch(leadFaceHTML({ engine: 'codex', motion: true, resting: true }), /animateMotion/);
-  const ids = [leadFaceHTML({ motion: true }), leadFaceHTML({ motion: true })].map(html => html.match(/clipPath id="([^"]+)"/)[1]);
-  assert.notEqual(ids[0], ids[1]);
+  // same state, same markup: screens compare HTML to skip redraws
+  assert.equal(leadFaceHTML({ motion: true }), leadFaceHTML({ motion: true }));
+  assert.doesNotMatch(calm, / id="/);
 });

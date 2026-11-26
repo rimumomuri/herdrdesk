@@ -10,17 +10,18 @@ const HERD_AGENTS = { href: 'icons/herd-agents-v1.png', width: 1774, height: 887
 const HERD_ENGINES = ['claude', 'codex'];
 // The orbit ring drawn in the sheet (fitted ellipse, cell units): a light runs along it, seen in front, hidden behind the body.
 const HERD_RING = { cx: 220.2, cy: 256.9, rx: 160.5, ry: 64.6, tilt: -17.2 };
-let herdSeq = 0;
 
 function herdRingLight(left, top, working) {
   const { cx, cy, rx, ry, tilt } = HERD_RING, rad = tilt * Math.PI / 180;
   const x = left + cx, y = top + cy, dx = rx * Math.cos(rad), dy = rx * Math.sin(rad);
   const start = (x - dx).toFixed(1) + ' ' + (y - dy).toFixed(1), end = (x + dx).toFixed(1) + ' ' + (y + dy).toFixed(1);
   const path = 'M' + start + ' A' + rx + ' ' + ry + ' ' + tilt + ' 0 0 ' + end + ' A' + rx + ' ' + ry + ' ' + tilt + ' 0 0 ' + start;
-  const id = 'herd-ring-' + (++herdSeq);
-  return '<clipPath id="' + id + '"><rect x="' + (x - 230).toFixed(1) + '" y="' + y.toFixed(1) + '" width="460" height="220" transform="rotate(' + tilt + ' ' + x.toFixed(1) + ' ' + y.toFixed(1) + ')"/></clipPath>'
-    + '<g class="herd-ring-light" clip-path="url(#' + id + ')"><g><circle class="herd-ring-halo" r="' + (working ? 44 : 32) + '"/><circle class="herd-ring-core" r="' + (working ? 20 : 15) + '"/><circle r="' + (working ? 8 : 6) + '" fill="#fff"/>'
-    + '<animateMotion dur="' + (working ? '1.3s' : '3.6s') + '" repeatCount="indefinite" path="' + path + '"/></g></g>';
+  // The path's first half is the front arc; on the back half the light fades out behind the body. No ids, so the
+  // same state always gives the same markup.
+  const dur = working ? '1.3s' : '3.6s';
+  return '<g class="herd-ring-light"><g opacity="0"><circle class="herd-ring-halo" r="' + (working ? 44 : 32) + '"/><circle class="herd-ring-core" r="' + (working ? 20 : 15) + '"/><circle r="' + (working ? 8 : 6) + '" fill="#fff"/>'
+    + '<animateMotion dur="' + dur + '" repeatCount="indefinite" path="' + path + '"/>'
+    + '<animate attributeName="opacity" dur="' + dur + '" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;0.05;0.45;0.5;1"/></g></g>';
 }
 // Where agents sit inside the open mouth (cell units), by how many there are.
 const HERD_SLOTS = [
