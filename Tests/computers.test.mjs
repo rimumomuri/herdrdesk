@@ -172,3 +172,16 @@ test('a computer whose connection needs a login says so instead of just offline'
   assert.equal(m6.connected, false);
   assert.equal(pro.state, 'offline');
 });
+
+test('when the board says how many seats are in use, that is the count, even between a worker\'s turns', () => {
+  const seats = profiles.map(p => p.name === 'local' ? {...p, used: 2} : p.name === 'macbook-m6' ? {...p, used: 1} : p);
+  const terms = [
+    {address:'t5', machine:'', state:'live', status:'working', labels:{'task.spawned':'1'}},
+    {address:'t6', machine:'', state:'live', status:'done', labels:{'task.spawned':'1'}},
+    {address:'macbook-m6/t11', machine:'macbook-m6', state:'live', status:'done', labels:{'task.spawned':'1'}},
+    {address:'macbook-m6/t12', machine:'macbook-m6', state:'live', status:'done', labels:{'task.spawned':'1'}},
+  ];
+  const [local, m6] = computerRows(seats, [{name:'macbook-m6', state:'connected'}], terms);
+  assert.deepEqual([local.used, local.parked], [2, 0]);
+  assert.deepEqual([m6.used, m6.parked], [1, 1]);   // one holds a card, one finished and waits to be retired
+});
