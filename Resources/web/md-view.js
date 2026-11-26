@@ -26,6 +26,31 @@ function mdResolveLinks(line, base) {
   })).join('');
 }
 
+// List entries in order, each with its indent; deeper entries become a list inside the item above them.
+function mdListHTML(entries, inline) {
+  const build = (at, level) => {
+    const { tag, start } = entries[at];
+    const items = [];
+    while (at < entries.length) {
+      const entry = entries[at];
+      if (entry.indent > level && items.length) {
+        const [child, next] = build(at, entry.indent);
+        items[items.length - 1] += child;
+        at = next;
+        continue;
+      }
+      if (entry.indent < level || entry.tag !== tag || (entry.indent > level && !items.length)) break;
+      items.push(inline(entry.body));
+      at++;
+    }
+    const open = '<' + tag + (tag === 'ol' && start > 1 ? ' start="' + start + '"' : '') + '>';
+    return [open + items.map(item => '<li>' + item + '</li>').join('') + '</' + tag + '>', at];
+  };
+  let html = '', at = 0;
+  while (at < entries.length) { const [part, next] = build(at, entries[at].indent); html += part; at = next; }
+  return html;
+}
+
 /** `base` is the folder that holds the document, for relative links. */
 export function markdownDocumentHTML(text, renderInline, escapeText, base = '') {
   const inline = value => renderInline(base ? mdResolveLinks(value, base) : value);
@@ -34,7 +59,7 @@ export function markdownDocumentHTML(text, renderInline, escapeText, base = '') 
   let para = [], quote = [], list = null;
   const flushPara = () => { if (para.length) { out.push('<p>' + inline(para.join('\n')) + '</p>'); para = []; } };
   const flushQuote = () => { if (quote.length) { out.push('<blockquote>' + markdownDocumentHTML(quote.join('\n'), renderInline, escapeText, base) + '</blockquote>'); quote = []; } };
-  const flushList = () => { if (list) { out.push('<' + list.tag + (list.start > 1 ? ' start="' + list.start + '"' : '') + '>' + list.items.join('') + '</' + list.tag + '>'); list = null; } };
+  const flushList = () => { if (list) { out.push(mdListHTML(list, inline)); list = null; } };
   const flush = () => { flushPara(); flushQuote(); flushList(); };
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -71,15 +96,12 @@ export function markdownDocumentHTML(text, renderInline, escapeText, base = '') 
     const item = line.match(mdListItem);
     if (item) {
       flushPara();
-      const tag = item[2] ? 'ul' : 'ol';
-      if (list && list.tag !== tag && item[1].length === 0) flushList();
-      if (!list) list = { tag, items: [], start: item[3] ? Number(item[3]) : 1 };
-      const depth = Math.min(3, Math.floor(item[1].length / 2));
-      const body = item[4].replace(/^\[([ xX])\][ \t]+/, (_, mark) => (mark === ' ' ? '☐ ' : '☑ '));
-      list.items.push('<li' + (depth ? ' class="md-indent-' + depth + '"' : '') + '>' + inline(body) + '</li>');
+      if (!list) list = [];
+      list.push({ indent: item[1].length, tag: item[2] ? 'ul' : 'ol', start: item[3] ? Number(item[3]) : 1,
+        body: item[4].replace(/^\[([ xX])\][ \t]+/, (_, mark) => (mark === ' ' ? '☐ ' : '☑ ')) });
       continue;
     }
-    if (list && /^ {2,}\S/.test(line)) { list.items[list.items.length - 1] = list.items.at(-1).replace(/<\/li>$/, '\n' + inline(line.trim()) + '</li>'); continue; }
+    if (list && /^ {2,}\S/.test(line)) { list.at(-1).body += '\n' + line.trim(); continue; }
     flushList();
     para.push(line);
   }

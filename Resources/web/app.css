@@ -1291,7 +1291,6 @@ button.computer-row:hover, button.computer-row:focus-visible { background:#fffff
 .md-document h1 { font-size:20px } .md-document h2 { font-size:17px } .md-document h3 { font-size:15px } .md-document h4,.md-document h5,.md-document h6 { font-size:13.5px }
 .md-document ul,.md-document ol { margin:.4em 0; padding-inline-start:22px }
 .md-document li { white-space:pre-wrap }
-.md-document li.md-indent-1 { margin-inline-start:18px } .md-document li.md-indent-2 { margin-inline-start:36px } .md-document li.md-indent-3 { margin-inline-start:54px }
 .md-document blockquote { margin:.6em 0; padding:0 12px; border-inline-start:3px solid #52525b; color:var(--muted) }
 .md-document pre { margin:.6em 0; padding:10px 12px; background:#141418; border-radius:6px; overflow:auto }
 .md-document pre code { background:none; padding:0; white-space:pre }

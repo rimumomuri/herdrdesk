@@ -16,8 +16,10 @@ test('bullet and numbered lists, with task boxes', () => {
     '<ul><li>one</li><li>two</li></ul><ol><li>a</li><li>b</li></ol><ul><li>☑ done</li><li>☐ todo</li></ul>');
 });
 
-test('nested list items keep their indent', () => {
-  assert.equal(html('- top\n  - inner'), '<ul><li>top</li><li class="md-indent-1">inner</li></ul>');
+test('nested lists sit inside their parent item and keep its numbering', () => {
+  assert.equal(html('- top\n  - inner'), '<ul><li>top<ul><li>inner</li></ul></li></ul>');
+  assert.equal(html('1. Build\n   - Install\n   - Compile\n2. Deploy'),
+    '<ol><li>Build<ul><li>Install</li><li>Compile</li></ul></li><li>Deploy</li></ol>');
 });
 
 test('code fences are escaped and not parsed', () => {
