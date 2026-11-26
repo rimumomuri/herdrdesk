@@ -1214,8 +1214,8 @@ html[data-inactive] .agent-portrait[data-working] * { animation-play-state:pause
 .hc-badge { margin-left:auto; flex:none; font-size:10.5px; padding:1px 8px; border-radius:999px; background:rgba(111,151,255,.14); color:#8fb0ff; white-space:nowrap }
 .hc-card[data-kind=reply] .hc-badge { background:rgba(67,201,143,.14); color:#5fd6a3 }
 .hc-card[data-kind=progress] .hc-badge,.hc-card[data-kind=message] .hc-badge,.hc-card[data-kind=pending] .hc-badge { background:#2b2b31; color:var(--muted) }
-.hc-body { font-size:12.5px; color:#d9d9e0; white-space:pre-wrap; overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; cursor:pointer }
-.hc-card[data-open] .hc-body { -webkit-line-clamp:unset; display:block }
+.hc-body { font-size:12.5px; color:#d9d9e0; white-space:normal; overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; cursor:pointer }
+.hc-card[data-open] .hc-body { -webkit-line-clamp:unset; display:block; white-space:pre-wrap; line-height:1.6 }   /* opened: one sentence per line */
 .presence-dot[data-presence=waiting] { background:#d9a646; box-shadow:0 0 4px #d9a64670 }
 
 /* Sidebar sections: collapsible, draggable headings and drop markers. */

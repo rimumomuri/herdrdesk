@@ -108,6 +108,15 @@ import { messageTag, tagHTML } from './message-tags.js';
 
 const CARD_BADGE = { assign: 'cardAssign', reply: 'cardReply', progress: 'cardProgress', message: 'cardMessage', pending: 'cardMessage' };
 
+/** A dense report as one sentence per line: break after 。．！？ and after . ! ? followed by a space. Dots inside
+ *  numbers, file names and links stay. No rewording, no summary. */
+export function readableBody(text) {
+  return String(text ?? '')
+    .replace(/([。．！？])[ \t]*(?=\S)/g, '$1\n')
+    .replace(/([.!?])[ \t]+(?=\S)/g, '$1\n')
+    .replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{2,}/g, '\n');
+}
+
 /** One handoff card for the chat: sender → receiver, badge, time, first two lines of the body. */
 export function handoffCardHTML(card, nameOf, portraitOf, escape, copy, timeOf) {
   let body = String(card.body || '').trim();
@@ -118,7 +127,7 @@ export function handoffCardHTML(card, nameOf, portraitOf, escape, copy, timeOf) 
   return '<div class="hc-card" data-kind="' + escape(kind) + '" data-tag="' + escape(tag) + '" data-record-id="' + escape(card.id) + '">'
     + '<div class="hc-head">' + tagHTML(tag, copy, escape) + side(card.from) + '<span class="hc-arrow" aria-hidden="true"></span>' + side(card.to)
     + '<small class="msg-time">' + escape(timeOf(card.at)) + '</small></div>'
-    + '<div class="hc-body" data-lines="2">' + escape(body) + '</div></div>';
+    + '<div class="hc-body" data-lines="2">' + escape(readableBody(body)) + '</div></div>';
 }
 
 /** Handed work to someone and has not had it back yet (open, weak or unconfirmed outgoing edge). */
