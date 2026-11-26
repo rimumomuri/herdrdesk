@@ -31,9 +31,11 @@ export function teamFlows(handoffs, members, statusOf, now, { limit = 3, collaps
   const flows = [], covered = [];
   const take = party => {
     if (covered.some(seen => flowSame(seen, party))) return;
-    const chain = buildChain(handoffs, named(party), statusOf, now, { collapse });
-    if (!chain) return;
-    for (const node of [...chain.nodes, ...chain.branches.flatMap(branch => branch.nodes)]) covered.push(node);
+    const full = buildChain(handoffs, named(party), statusOf, now, { collapse: false });
+    if (!full) return;
+    // Coverage counts everyone in the flow, also those the folded display leaves out.
+    for (const node of [...full.nodes, ...full.branches.flatMap(branch => branch.nodes)]) covered.push(node);
+    const chain = collapse ? buildChain(handoffs, named(party), statusOf, now, { collapse }) : full;
     flows.push(markWaiting(chain));
   };
   parties.filter(party => !handedByTeam(party)).sort(rank).forEach(take);

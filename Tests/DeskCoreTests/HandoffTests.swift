@@ -54,6 +54,25 @@ final class HandoffTests: XCTestCase {
         XCTAssertEqual(book.edges[0].summary, "keep going on the same card")
     }
 
+    func testReopenedFollowUpIsNotClosedByThePreviousResultLabel() {
+        let book = HandoffBook()
+        book.record(msg(lead, prod, t0))
+        var done = signals(["t2":"idle"])
+        done.flows = [HandoffFlow(worker:prod, lead:lead, id:"f1", phase:"result-sent", updatedAt:t0 + 30_000)]
+        book.observe(done, now: t0 + 31_000)
+        XCTAssertEqual(book.edges[0].state, "closed")
+        book.record(msg(lead, prod, t0 + 60_000, "keep going"))
+        var again = signals(["t2":"working"]); again.statusSince = ["t2": t0 + 61_000]
+        again.flows = done.flows
+        book.observe(again, now: t0 + 62_000)
+        XCTAssertEqual(book.edges[0].state, "open")
+        book.observe(again, now: t0 + 63_000)
+        XCTAssertEqual(book.edges[0].state, "open")
+        var next = again; next.flows = [HandoffFlow(worker:prod, lead:lead, id:"f1", phase:"result-sent", updatedAt:t0 + 90_000)]
+        book.observe(next, now: t0 + 91_000)
+        XCTAssertEqual(book.edges[0].state, "closed")   // a new result for the follow-up still closes it
+    }
+
     func testAcknowledgementDoesNotReopenWhenReceiverStaysIdle() {
         let book = HandoffBook()
         book.record(msg(lead, prod, t0))

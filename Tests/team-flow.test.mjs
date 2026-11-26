@@ -46,3 +46,11 @@ test('more than three flows are folded into a count', () => {
   assert.equal(flows.length, 3);
   assert.equal(hidden, 2);
 });
+
+test('a long chain folded for display is still one flow', () => {
+  const chainOf = Array.from({ length: 8 }, (_, i) => p('t' + (10 + i), 'r' + i));
+  const edges = chainOf.slice(1).map((to, i) => edge(chainOf[i], to));
+  const { flows } = teamFlows({ edges }, chainOf, status({ t17: 'working' }), now);
+  assert.equal(flows.length, 1);
+  assert.ok(flows[0].hidden > 0);
+});

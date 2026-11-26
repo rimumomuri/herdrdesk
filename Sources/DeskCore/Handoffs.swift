@@ -81,6 +81,8 @@ public struct HandoffEdge: Codable {
     public var answeredAt: Double? = nil
     /// A message from the sender right after this closed. If the receiver starts working on it, the handoff reopens.
     public var followUpAt: Double? = nil
+    /// When a follow-up reopened it: flow and lineage labels from before then belong to the earlier work.
+    public var reopenedAt: Double? = nil
     var isOpen: Bool { ["open", "weak", "unconfirmed"].contains(state) }
 }
 
@@ -168,7 +170,7 @@ public final class HandoffBook {
             guard s.status[to] == "working", s.statusSince[to].map({ $0 >= follow }) ?? true,
                   edges[i].to.session.isEmpty || s.session[to] == nil || s.session[to] == edges[i].to.session else { continue }
             edges[i].state = "open"; edges[i].closedAt = nil; edges[i].returnedAt = nil
-            edges[i].workedSinceOpen = true; edges[i].updatedAt = follow; edges[i].followUpAt = nil
+            edges[i].workedSinceOpen = true; edges[i].updatedAt = follow; edges[i].followUpAt = nil; edges[i].reopenedAt = follow
         }
         for i in edges.indices where edges[i].isOpen {
             var e = edges[i]
@@ -181,7 +183,12 @@ public final class HandoffBook {
                 if e.state != "open" { e.state = "open" }
             }
             // herdr-flow is the strongest signal, but only a flow written for this handoff (not an old label).
-            let fresh: (Double?) -> Bool = { at in at.map { $0 >= e.openedAt - Self.mergeWindow } ?? false }
+            let since = e.reopenedAt, opened = e.openedAt
+            let fresh: (Double?) -> Bool = { at in
+                guard let at else { return false }
+                if let since { return at > since }
+                return at >= opened - Self.mergeWindow
+            }
             if let flow = s.flows.last(where: { $0.worker.same(e.to) && $0.lead.same(e.from) && fresh($0.updatedAt) }) {
                 e.signal = "flow"; e.flowId = flow.id
                 switch flow.phase {
