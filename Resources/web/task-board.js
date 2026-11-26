@@ -13,13 +13,15 @@ function waitingOrder(a, b) {
   return wait(a) - wait(b) || rank(a) - rank(b) || ms(a.created) - ms(b.created);
 }
 
-export function boardColumns(team, now) {
+/** `ownerLive(owner)`: is the worker that did a card still there? A finished card whose worker has ended is dropped. */
+export function boardColumns(team, now, { ownerLive = null } = {}) {
   const cards = team?.cards || [];
   const titles = new Map(cards.map(card => [card.id, card.title || card.id]));
   return BOARD_STATES.map(state => ({
     state,
     cards: cards
-      .filter(card => card.state === state && (state !== 'done' || now - ms(card.updated) <= DONE_WINDOW))
+      .filter(card => card.state === state && (state !== 'done' || (now - ms(card.updated) <= DONE_WINDOW
+        && (!ownerLive || Boolean(card.owner && ownerLive(card.owner))))))
       .sort(state === 'queued' ? waitingOrder : (a, b) => ms(b.updated) - ms(a.updated))
       .map(card => ({
         id: card.id, title: card.title || '', owner: card.owner?.address || null,
