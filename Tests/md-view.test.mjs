@@ -46,3 +46,11 @@ test('relative links resolve against the document folder', () => {
     s => esc(s), esc, '/Users/me/project/notes');
   assert.equal(out, '<p>See [config](&lt;/Users/me/project/notes/docs/config.md&gt;), [up](&lt;/Users/me/project/README.md&gt;), [web](https://a.b), [abs](/x/y.md), `[c](d.md)`</p>');
 });
+
+test('wrapped, titled and parenthesised relative links become real shortcuts', async () => {
+  const {chatShortcutSegments} = await import('../Resources/web/chat-shortcuts.js');
+  const links = text => chatShortcutSegments(text).filter(part => typeof part !== 'string').map(part => decodeURIComponent(part.href.replace('herdrdesk-path:', '')));
+  const render = s => JSON.stringify(links(s));
+  const out = markdownDocumentHTML('[a](<docs/my plan.md>) [b](docs/plan.md "Plan") [c](docs/plan(v2).md)', render, esc, '/Users/me/p');
+  assert.equal(out, '<p>' + JSON.stringify(['/Users/me/p/docs/my plan.md', '/Users/me/p/docs/plan.md', '/Users/me/p/docs/plan(v2).md']) + '</p>');
+});

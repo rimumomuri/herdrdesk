@@ -11,7 +11,8 @@ const mdListItem = /^( *)(?:([-*+])|(\d{1,9})[.)])[ \t]+(.*)$/;
 
 // `[label](docs/x.md)` points next to the document; rewrite it to an absolute path the chat shortcuts understand.
 function mdResolveLinks(line, base) {
-  return line.split(/(`[^`\n]*`)/).map((part, index) => index % 2 ? part : part.replace(/\[([^\n\[\]]+)\]\(([^\s()<>]+)\)/g, (whole, label, target) => {
+  return line.split(/(`[^`\n]*`)/).map((part, index) => index % 2 ? part : part.replace(/\[([^\n\[\]]+)\]\((?:<([^\n<>]+)>|((?:[^\s()<>]|\([^\s()<>]*\))+))(?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'))?\)/g, (whole, label, wrapped, plain) => {
+    const target = wrapped ?? plain;
     if (/^(?:[a-z][\w+.-]*:|\/|~\/|#)/i.test(target)) return whole;
     let relative = target.replace(/[?#].*$/, '');
     try { relative = decodeURIComponent(relative); } catch { return whole; }
