@@ -1578,6 +1578,16 @@ function detail() {
   else setPanel('#targetAvatar',room?teamEmblem(room):icon);
   $('#recipient').textContent=term?copy('recipient')+' · '+term.label:'';
   $('#targetTitle').textContent = room?.title || term?.label || (chosen && snapshot.connection === 'live' ? copy('sessionChanged') : copy('select'));
+  // Team chat or 1:1, told apart at a glance: a badge on the title, and in a team chat the team's ring color on the
+  // header line and the composer (orange for a Claude lead, violet for Codex).
+  const chatKind=page==='conversations'&&(room||term)?(room?'team':'direct'):'';
+  document.querySelector('main').dataset.chatKind=chatKind;
+  document.querySelector('main').style.setProperty('--chat-c',portraitProvider(term)==='claude'?'#ff8a1f':'#8b6cff');
+  if(chatKind){
+    const badge=document.createElement('span');
+    badge.className='chat-kind'; badge.dataset.kind=chatKind; badge.textContent=copy(chatKind==='team'?'chatKindTeam':'chatKindDirect');
+    $('#targetTitle').append(' ',badge);
+  }
   $('#targetPath').textContent=room?(term?copy('leadTo')+' · '+term.label:copy('leadUnavailable'))
     :term?[agentLabel(term),machineFor(term)].filter(Boolean).join(' · '):'';
   $('#send').textContent=copy(room?'sendToLead':page==='conversations'?'directSend':'send');
