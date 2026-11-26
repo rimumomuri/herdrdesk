@@ -251,3 +251,13 @@ export function elapsedText(ms, units) {
   const fill = (pattern, values) => pattern.replace(/\{(\w)\}/g, (_, key) => String(values[key]));
   return h ? fill(units.hm, { h, m }) : m ? fill(units.ms, { m, s }) : fill(units.s, { s });
 }
+
+/** The model an agent is working with: what it reports, else its launch flags, else the local config default. The
+ *  default effort only goes with the default model. */
+export function modelInUse(options = {}) {
+  const o = options || {};
+  if (o.reportedModel) return { model: o.reportedModel, effort: o.reportedEffort || '', source: 'reported' };
+  if (o.launchModel) return { model: o.launchModel, effort: o.launchEffort || (o.launchModel === o.defaultModel ? o.defaultEffort || '' : ''), source: 'launch' };
+  if (o.defaultModel) return { model: o.defaultModel, effort: o.launchEffort || o.defaultEffort || '', source: 'default' };
+  return { model: '', effort: '', source: '' };
+}
