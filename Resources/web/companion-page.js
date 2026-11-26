@@ -28,7 +28,8 @@ window.companion = {
       // the agent's own character, drawn the way the main window draws it
       if (faceKey !== currentFace || newFlash) {
         const art = face.kind === 'agent' ? agentFaceHTML({ engine: face.provider, resting: face.sleeping })
-          : leadFaceHTML({ engine: face.provider, mouth: face.mouth || [], resting: face.sleeping });
+          : leadFaceHTML({ engine: face.provider, mouth: face.mouth || [], resting: face.sleeping, working: face.working,
+              motion: !window.matchMedia('(prefers-reduced-motion: reduce)').matches });
         document.getElementById('companionSheep').innerHTML = face.working ? withWorkTool(art) : art;
       }
     } else if (moodChanged || newFlash || currentFace !== 'sheep' || !root.querySelector('.sheep')) {

@@ -43,3 +43,13 @@ test('the face markup names its frame and holds one image per agent in the mouth
   assert.match(worker, /data-engine="claude"/);
   assert.match(agentFaceHTML({ engine: 'nope' }), /data-engine="codex"/);
 });
+
+test('a light runs along the ring when motion is on, faster while working, never while asleep', () => {
+  assert.doesNotMatch(leadFaceHTML({ engine: 'codex' }), /animateMotion/);
+  const calm = leadFaceHTML({ engine: 'codex', motion: true });
+  assert.match(calm, /<animateMotion dur="3.6s"/);
+  assert.match(leadFaceHTML({ engine: 'codex', motion: true, working: true }), /<animateMotion dur="1.3s"/);
+  assert.doesNotMatch(leadFaceHTML({ engine: 'codex', motion: true, resting: true }), /animateMotion/);
+  const ids = [leadFaceHTML({ motion: true }), leadFaceHTML({ motion: true })].map(html => html.match(/clipPath id="([^"]+)"/)[1]);
+  assert.notEqual(ids[0], ids[1]);
+});

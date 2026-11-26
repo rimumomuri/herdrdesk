@@ -309,21 +309,23 @@ function agentPortrait(term, moving=false, preview=false, working=false) {
   const resting=!(working||moving||busyNow(term));
   let art;
   if(isCardWorker(term.labels))art=agentFaceHTML({engine:provider,resting});
-  else{ const mouth=mouthOf(term); art=leadFaceHTML({engine:provider,mouth,resting,fresh:freshMouth(term,mouth.length)}); }
+  else{ const mouth=mouthOf(term); art=leadFaceHTML({engine:provider,mouth,resting,fresh:freshMouth(term,mouth.length),working:!resting,motion:!motionPreference.matches}); }
   return working?withWorkTool(art):art;
 }
-/** Engines of the agents this one handed work to and has not had back (confirmed handoffs only). */
-function mouthOf(term){
+/** The agents this one handed work to and has not had back (confirmed handoffs only), with their engines. */
+function mouthTargets(term){
   if(!term||snapshot.connection!=='live')return [];
   const seen=new Set();
   return (snapshot.handoffs?.edges||[]).filter(edge=>edge.state==='open'&&edge.from?.address===term.address&&(!edge.from.session||!term.session||edge.from.session===term.session)
       &&edge.to?.address&&edge.to.address!=='desk'&&!seen.has(edge.to.address)&&seen.add(edge.to.address))
-    .map(edge=>portraitProvider(inventory.find(item=>item.address===edge.to.address))||'codex');
+    .map(edge=>({address:edge.to.address,engine:portraitProvider(inventory.find(item=>item.address===edge.to.address))||'codex'}));
 }
+const mouthOf=term=>mouthTargets(term).map(target=>target.engine);
 // How many agents just went into a mouth (for 3.2s), so only those play the swallow motion. The first look plays none.
 const mouthMemory=new Map();
-function freshMouth(term,count){
-  const key=sessionKey(term), was=mouthMemory.get(key), now=Date.now();
+const freshMouth=(term,count)=>freshMouthFor(sessionKey(term),count);
+function freshMouthFor(key,count){
+  const was=mouthMemory.get(key), now=Date.now();
   if(!was){mouthMemory.set(key,{count,fresh:0,until:0});return 0;}
   if(count>was.count){was.fresh=count-was.count;was.until=now+3200;}
   was.count=count;
@@ -565,6 +567,14 @@ function teamEmblem(room,roster=roomRoster(room)){
   const recent=new Map([...characters.keys()].map((key,index)=>[key,index+1]));
   const score=member=>recent.get(characterID(member))||0;
   const lead=roster.find(member=>member.isLead||(room.lead&&legacyDraftKey(member)===room.lead));
+  if(lead&&portraitProvider(lead)){
+    // The team as one sheep: its lead, holding the team's live card workers (and anyone it handed work to) in its mouth.
+    const inside=new Map(mouthTargets(lead).map(target=>[target.address,target.engine]));
+    for(const member of roster)if(member!==lead&&member.state==='live'&&isCardWorker(member.labels)&&!inside.has(member.address))inside.set(member.address,portraitProvider(member)||'codex');
+    const mouth=[...inside.values()], working=busyNow(lead);
+    const art=leadFaceHTML({engine:portraitProvider(lead),mouth,resting:!working,fresh:freshMouthFor('emblem:'+room.id,mouth.length),working,motion:!motionPreference.matches});
+    return '<span class="team-emblem" data-members="1" data-herd aria-hidden="true"><span>'+(working?withWorkTool(art):art)+'</span></span>';
+  }
   const ranked=roster.filter(member=>member!==lead).sort((a,b)=>score(b)-score(a));
   const faces=(lead?[lead,...ranked]:ranked).slice(0,3);
   return '<span class="team-emblem" data-members="'+Math.max(1,faces.length)+'" aria-hidden="true">'
