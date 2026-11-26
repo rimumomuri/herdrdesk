@@ -198,7 +198,7 @@ computers:['Computers','컴퓨터','コンピューター'],computerMain:['main'
  receivedHandoff:['Received','수신 확인','受信確認'],
  transferSent:['Sent','보냄','送信済み'],
  incomingHandoff:['From another agent','담당자 인계','担当者からの引き継ぎ'],
- working:['Working','작업 중','作業中'],idle:['Idle','대기','待機中'],done:['Turn ended','응답 완료','応答完了'],
+ working:['Working','작업 중','作業中'],elapsedS:['{s}s','{s}초','{s}秒'],elapsedMS:['{m}m {s}s','{m}분 {s}초','{m}分{s}秒'],elapsedHM:['{h}h {m}m','{h}시간 {m}분','{h}時間{m}分'],idle:['Idle','대기','待機中'],done:['Turn ended','응답 완료','応答完了'],
  blocked:['Needs attention','응답 필요','要確認'],error:['Error','오류','エラー'],unknown:['Unknown','미확인','未確認'],
  local:['This Mac','이 Mac','この Mac'],other:['Other terminals','기타 터미널','その他のターミナル'],
  noTerminals:['No live terminals. Start a terminal in Herdr.','실행 중인 터미널이 없습니다. Herdr에서 터미널을 시작하세요.','実行中のターミナルはありません。Herdr で起動してください。'],

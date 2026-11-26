@@ -235,3 +235,19 @@ export function memoLast(fn) {
     return last;
   };
 }
+
+/** When the agent started its current work: the transcript's turn start if it is the newest signal, else when the
+ *  terminal became working (hc status_ms). Null when neither is known. */
+export function workingSince(term, runtime) {
+  const status = Number.isFinite(term?.statusMs) ? term.statusMs : null;
+  const turn = runtime?.state === 'working' ? Date.parse(runtime.at) : NaN;
+  if (Number.isFinite(turn) && (status === null || turn >= status)) return turn;
+  return status;
+}
+
+/** "12초", "3분 5초", "1시간 4분": `units` holds the localized {s} / {m} {s} / {h} {m} patterns. */
+export function elapsedText(ms, units) {
+  const total = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(total / 3600), m = Math.floor(total % 3600 / 60), s = total % 60;
+  const fill = (pattern, values) => pattern.replace(/\{(\w)\}/g, (_, key) => String(values[key]));
+  return h ? fill(units.hm, { h, m }) : m ? fill(units.ms, { m, s }) : fill(units.s, { s });
+}
