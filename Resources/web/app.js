@@ -5,6 +5,7 @@ import { waitingInboxItems, waitingInboxMarkup } from './waiting-inbox.js';
 import { lineageMarkup, linkedWaiting } from './lineage.js';
 import { chatShortcutSegments } from './chat-shortcuts.js';
 import { portraitArtwork, withWorkTool, sheepStyles, sheepCoats, resolveSheepStyle, sheepAccessories, resolveSheepAccessory } from "./portrait.js";
+import { roleLook } from './role-look.js';
 import { t, languageFrom } from './locale.js';
 import { shortRoleTitle, nextKey, chatHidden, foldLeadChats, inRoomConversation, groupRows, moveChat, moveSection, toggleSection, addSection, renameSection, deleteSection } from './chat-sections.js';
 import { buildChain, handoffCardsFor, handoffCardHTML, isDelegating } from './handoff-chain.js';
@@ -112,7 +113,7 @@ function companionAttention(){
 }
 /** The agent's own character for the companion: provider and chosen look, never names or text. Null when it has none. */
 function companionPortrait(term,mood){
-  const provider=portraitProvider(term), character=term&&characters.get(characterID(term));
+  const provider=portraitProvider(term), character=term&&lookOf(term);
   if(!provider&&!character)return null;
   return {provider:provider||'neutral',style:character?.style||'classic',coat:character?.coat||'cream',accessory:character?.accessory||'none',
     sleeping:mood==='idle'||mood==='offline',working:mood!=='attention'&&workingNow(term)};
@@ -184,6 +185,9 @@ let membersOpen=false;
 const characterKey='ui.agentCharacters.v1';
 const characters=new Map(Object.entries(load(characterKey,{})));
 const defaultCharacter={style:'classic',coat:'cream',accessory:'none'};
+// A card worker starts with its role's look; a look the person picked always wins.
+const baseLook=term=>roleLook(term?.labels)||defaultCharacter;
+const lookOf=term=>characters.get(characterID(term))||roleLook(term?.labels);
 let characterDraft=null;
 const pinKey='ui.pinnedChats.v1';
 const storedPins=load(pinKey,[]);
@@ -296,7 +300,7 @@ const characterID=term=>{
 const canCustomize=term=>Boolean(term?.program?.agent||portraitProvider(term)||characters.has(characterID(term)));
 function agentPortrait(term, moving=false, preview=false, working=false) {
   const provider=portraitProvider(term);
-  const character=characters.get(characterID(term));
+  const character=lookOf(term);
   if(!provider&&!character)return '';
   const art=portraitArtwork(provider||'neutral',moving&&!document.hidden&&!motionPreference.matches,character?.style,character?.coat,preview,character?.accessory,!(working||moving||busyNow(term)));
   const shown=working?withWorkTool(art):art;
@@ -1839,8 +1843,8 @@ function renderCharacterPicker() {
 function openCharacterPicker(term, opener) {
   if(!canCustomize(term))return;
   const key=characterID(term);
-  const character=characters.get(key)||defaultCharacter;
-  characterDraft={key,style:resolveSheepStyle(character.style),coat:sheepCoats.has(character.coat)?character.coat:defaultCharacter.coat,accessory:resolveSheepAccessory(character.accessory),opener};
+  const base=baseLook(term), character=characters.get(key)||base;
+  characterDraft={key,base,style:resolveSheepStyle(character.style),coat:sheepCoats.has(character.coat)?character.coat:base.coat,accessory:resolveSheepAccessory(character.accessory),opener};
   $('#characterOwner').textContent=term.label;
   renderCharacterPicker();
   $('#characterDialog').showModal();
@@ -1856,15 +1860,15 @@ $('#characterDialog').addEventListener('close',event=>{
   if(opener?.isConnected)opener.focus({preventScroll:true});
 });
 $('#characterReset').addEventListener('click',()=>{
-  Object.assign(characterDraft,defaultCharacter);
+  Object.assign(characterDraft,characterDraft.base);
   renderCharacterPicker();
 });
 $('#characterSave').addEventListener('click',()=>{
-  const {key,style,coat,accessory}=characterDraft;
-  const previous=characters.get(key)||defaultCharacter;
+  const {key,style,coat,accessory,base}=characterDraft;
+  const previous=characters.get(key)||base;
   if(style!==resolveSheepStyle(previous.style)||coat!==previous.coat||accessory!==resolveSheepAccessory(previous.accessory)){
     characters.delete(key);
-    if(style!==defaultCharacter.style||coat!==defaultCharacter.coat||accessory!==defaultCharacter.accessory){
+    if(style!==base.style||coat!==base.coat||accessory!==base.accessory){
       characters.set(key,{style,coat,accessory});
     }
   }
