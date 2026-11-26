@@ -28,7 +28,7 @@ body.companion-body { display:block; min-height:0; min-width:0 }
 .companion-bubble:empty { display:none!important }
 .companion-bubble div { white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 .companion.hovered .companion-bubble { display:block; animation:companion-pop .16s var(--motion-ease) both }
-.companion.nudge .sheep-animal, .companion.nudge .agent-portrait svg { animation:companion-bounce .9s var(--motion-ease) both }
+.companion.nudge .sheep-animal, .companion.nudge .agent-portrait>svg { animation:companion-bounce .9s var(--motion-ease) both }
 .companion.nudge .companion-figure { animation:companion-ring 1s ease-out both }
 @keyframes companion-bounce { 0%,100% { transform:none } 20% { transform:translateY(-6px) rotate(-6deg) } 42% { transform:rotate(4deg) } 62% { transform:translateY(-3px) rotate(-3deg) } }
 @keyframes companion-ring { 0% { outline:2px solid #e5484d; outline-offset:0 } 100% { outline:2px solid #e5484d00; outline-offset:12px } }

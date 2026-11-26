@@ -50,7 +50,7 @@ export function leadFaceHTML({ engine = 'codex', mouth = [], resting = false, fr
   const inside = slots.map((slot, index) => slot.more
     ? '<g class="herd-mouth-more">' + [0, 1, 2].map(dot => '<circle cx="' + (left + slot.x + 10 + dot * 16) + '" cy="' + (top + slot.y + slot.size / 2) + '" r="5.5" fill="#f4efe6"/>').join('') + '</g>'
     : herdAgentImage(herdEngine(mouth[index]), left + slot.x, top + slot.y, slot.size,
-      ' class="herd-mouth-agent"' + (index >= slots.length - fresh ? ' data-new="true" style="animation-delay:' + ((index - (slots.length - fresh)) * 0.12).toFixed(2) + 's"' : ''))).join('');
+      ' class="herd-mouth-agent"' + (index >= slots.length - fresh ? ' data-new="true"' : ''))).join('');
   return '<span class="agent-portrait" data-face="lead" data-frame="' + frame + '" data-row="' + row + '" data-sleep="' + (frame === 'sleep') + '" aria-hidden="true">'
     + '<svg viewBox="' + (left + cx) + ' ' + (top + cy) + ' ' + side + ' ' + side + '" focusable="false"><g class="herd-body">'
     + '<image href="' + HERD_LEADS.href + '" width="' + HERD_LEADS.size + '" height="' + HERD_LEADS.size + '"/>' + inside + '</g></svg></span>';
