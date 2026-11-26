@@ -17,7 +17,7 @@ function nudge() {
 }
 
 window.companion = {
-  /** state: {mood, count, working, flash, flashAt, lines, face: {provider, style, coat, accessory, sleeping, working} | null} */
+  /** state: {mood, count, working, flash, flashAt, lines, face: {provider, kind: lead|agent, mouth: [engine], sleeping, working} | null} */
   show(state) {
     const moodChanged = current?.mood !== state.mood;
     const newFlash = state.flash && (state.flash !== current?.flash || state.flashAt !== current?.flashAt);
@@ -27,7 +27,8 @@ window.companion = {
     if (face) {
       // the agent's own character, drawn the way the main window draws it
       if (faceKey !== currentFace || newFlash) {
-        const art = portraitArtwork(face.provider, false, face.style, face.coat, false, face.accessory, face.sleeping);
+        const art = face.kind === 'agent' ? agentFaceHTML({ engine: face.provider, resting: face.sleeping })
+          : leadFaceHTML({ engine: face.provider, mouth: face.mouth || [], resting: face.sleeping });
         document.getElementById('companionSheep').innerHTML = face.working ? withWorkTool(art) : art;
       }
     } else if (moodChanged || newFlash || currentFace !== 'sheep' || !root.querySelector('.sheep')) {

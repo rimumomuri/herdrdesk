@@ -564,6 +564,11 @@ html[data-inactive] .sheep[data-motion] * { animation-play-state:paused }
 /* Match the approved prototype with inline vector portraits. */
 .agent-portrait { display:inline-grid; place-items:center; width:25px; height:25px; flex:none; vertical-align:middle }
 .agent-portrait svg { display:block; width:100%; height:100% }
+/* Herd faces: an agent swallowed into a lead's mouth pops in; a resting worker dims a little. */
+.herd-mouth-agent[data-new] { transform-box:fill-box; transform-origin:50% 50%; animation:herd-swallow .55s cubic-bezier(.3,1.4,.5,1) both }
+@keyframes herd-swallow { from { transform:translateY(-60%) scale(.2); opacity:0 } 60% { opacity:1 } to { transform:none; opacity:1 } }
+.agent-portrait[data-face=agent][data-sleep=true] svg { filter:saturate(.55) brightness(.85) }
+@media (prefers-reduced-motion: reduce) { .herd-mouth-agent[data-new] { animation:none } }
 #targetAvatar:has(.agent-portrait) { background:transparent }
 #targetAvatar>.agent-portrait { width:33px; height:33px }
 .directory-row .agent-portrait { width:23px; height:23px }

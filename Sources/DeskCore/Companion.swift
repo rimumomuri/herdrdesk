@@ -46,7 +46,10 @@ public enum CompanionLayout {
     /// The agent's look: a known provider and short lowercase style names (the page maps unknown names to defaults).
     static func face(_ value: Any?) -> [String: Any]? {
         guard let body = value as? [String: Any], let provider = body["provider"] as? String, ["codex", "claude", "neutral"].contains(provider) else { return nil }
-        var face: [String: Any] = ["provider": provider, "sleeping": body["sleeping"] as? Bool ?? false, "working": body["working"] as? Bool ?? false]
+        var face: [String: Any] = ["provider": provider, "sleeping": body["sleeping"] as? Bool ?? false, "working": body["working"] as? Bool ?? false,
+                                   "kind": (body["kind"] as? String) == "agent" ? "agent" : "lead"]
+        // Engines of the agents a lead is holding (what it handed work to): known names only, a few at most.
+        face["mouth"] = (body["mouth"] as? [Any] ?? []).prefix(9).compactMap { $0 as? String }.filter { ["codex", "claude"].contains($0) }
         for key in ["style", "coat", "accessory"] {
             let name = body[key] as? String ?? ""
             guard name.count <= 24, name.allSatisfy({ ("a"..."z").contains($0) || ("0"..."9").contains($0) || $0 == "-" }) else { return nil }
