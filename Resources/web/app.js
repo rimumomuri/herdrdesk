@@ -24,7 +24,7 @@ import { filterPalette, paletteHTML } from './palette.js';
 import { sendBlocked, deferredSaver } from './composer.js';
 import { freshEntries } from './motion.js';
 import { stickyScroll } from './chat-scroll.js';
-import { makeInventory, makeTeamDirectory, listedGroup, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus, memoLast } from './model.js';
+import { makeInventory, makeTeamDirectory, listedGroup, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus, memoLast, workingSince, elapsedText } from './model.js';
 import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
 import { enterAction, SEND_DEDUPE_MS } from './keys.js';
 import { createTerminalView } from './terminal-view.js';
@@ -336,6 +336,23 @@ const assignmentActive=term=>Boolean(term && (assignmentMotion.get(sessionKey(te
 const effectiveStatus=term=>observedAgentStatus(term,snapshot.liveTurns?.[sessionKey(term)]);
 const delegatingNow=term=>Boolean(term)&&snapshot.connection==='live'&&isDelegating(snapshot.handoffs,{address:term.address,session:term.session});
 const workingNow=term=>snapshot.connection==='live'&&effectiveStatus(term)==='working';
+// How long it has been working, as the terminal shows it. The <time> is left empty and filled by the ticker below, so
+// screens that skip redraws when their HTML is unchanged are not redrawn as the seconds pass.
+const elapsedHTML=term=>{
+  const since=term&&workingNow(term)?workingSince(term,snapshot.liveTurns?.[sessionKey(term)]):null;
+  return since?'<time class="work-elapsed" data-since="'+since+'"></time>':'';
+};
+function tickElapsed(){
+  const now=Date.now(), units={s:copy('elapsedS'),ms:copy('elapsedMS'),hm:copy('elapsedHM')};
+  for(const el of document.querySelectorAll('time.work-elapsed[data-since]')){
+    const text=elapsedText(now-Number(el.dataset.since),units);
+    if(el.textContent!==text)el.textContent=text;
+  }
+}
+let elapsedQueued=false;
+const queueElapsed=()=>{ if(elapsedQueued)return; elapsedQueued=true; requestAnimationFrame(()=>{elapsedQueued=false;tickElapsed();}); };
+setInterval(tickElapsed,1000);
+new MutationObserver(queueElapsed).observe(document.documentElement,{childList:true,subtree:true});
 
 function markAssignment(key){
   if(!key)return;
@@ -606,7 +623,7 @@ function renderRooms(){
       title:room.title, icon:teamEmblem(room,roster), at:feed.at(-1)?.at||0,
       preview:[countsLabel(room.id),latest?snippet(latest.author+' · '+latest.body):''].filter(Boolean).join(' · '),
       note:roster.length+copy(roster.length===1?'memberCountOne':'memberCount'), pending, unread,
-      state:status?copy('working'):room.members.some(delegatingNow)?copy('waitingOnOthers'):'',
+      state:status?copy('working'):room.members.some(delegatingNow)?copy('waitingOnOthers'):'', elapsed:elapsedHTML(live.find(workingNow)),
       indicator:status?presence(status):''
     };
   });
@@ -624,7 +641,7 @@ function renderRooms(){
       direct:sessionKey(term), selected:!selected&&sessionKey(term)===sessionKey(active()),
       title, shortTitle, team:team===title?'':team,
       icon:agentPortrait(term,busyNow(term),true,busyNow(term))||avatar(shortTitle), at:entries.at(-1)?.at||0,
-      preview:latest?snippet(latest.text||copy('attachedImages')):'', state:memberStatus(term),
+      preview:latest?snippet(latest.text||copy('attachedImages')):'', state:memberStatus(term), elapsed:elapsedHTML(term),
       pending, indicator:presence(term), archived:term.state==='archived'
     });
   }
@@ -747,7 +764,7 @@ function conversationItem(row,pinned){
       +(pinnedRole?'<span class="chat-team-tag">'+escape(row.shortTitle||row.title)+'</span>':tag||count)
     :row.icon+'<span class="room-preview-copy"><span class="conversation-heading"><span class="room-title">'
       +title+'</span>'+tag+'</span>'
-      +(row.preview||row.state?'<small class="room-preview">'+escape(row.preview||row.state)+'</small>':'')
+      +(row.preview||row.state||row.elapsed?'<small class="room-preview">'+(row.elapsed||'')+escape(row.preview||row.state||'')+'</small>':'')
       +'</span><span class="room-signals">'+count+signals+'</span>';
   return '<div class="'+(pinned?'pinned-tile':'conversation-row')+(chatHidden(row,pref)?' hidden-conversation':'')+'" data-conversation="'+escape(row.key)+'"'+(chatHidden(row,pref)?'':' draggable="true"')+'><button class="'
     +(pinned?'pinned-open':'room-row')+'" type="button"'
@@ -770,7 +787,7 @@ function renderGroupMembers(room){
     const status=[agentName(term),memberStatus(term)].filter(Boolean).join(' · ');
     return '<button class="roster-member" type="button" title="'+escape(term.label)+'"'
       +(term.address?' data-group-member="'+escape(sessionKey(term))+'"':' disabled')+'>'
-      +(agentPortrait(term,busyNow(term)||assignmentActive(term),false,busyNow(term))||avatar(name))+'<span><b>'+escape(name)+'</b><small>'+escape(status)+'</small></span></button>';
+      +(agentPortrait(term,busyNow(term)||assignmentActive(term),false,busyNow(term))||avatar(name))+'<span><b>'+escape(name)+'</b><small>'+escape(status)+elapsedHTML(term)+'</small></span></button>';
   };
   const focus=document.activeElement?.dataset.groupMember;
   const changed=setPanel('#groupMembers','<div class="roster-head">'+teamEmblem(room,roster)+'<div><strong>'+escape(room.title)
@@ -1380,7 +1397,7 @@ function railNode(node){
   const face=node.address==='desk'?avatar(copy('you')):(term&&agentPortrait(term,working))||leadFaceHTML({engine:'neutral',resting:true});
   const label=working?copy('flowWorking'):state==='waiting'&&node.waitingFor?copy('flowWaitingFor').replace('{name}',()=>railName({address:node.waitingFor,role:''})):copy('chainState_'+state);
   return '<div class="hr-node" data-state="'+escape(state)+'"'+(node.address==='desk'?' data-desk':'')+(node.sessionActivity?' data-activity="'+escape(node.sessionActivity)+'"':'')+'><span class="hr-face">'+face+(working?RAIL_HAMMER:'')+'</span>'
-    +'<b class="hr-name">'+escape(railName(node))+'</b><small class="hr-state">'+(RAIL_ICONS[state]||'')+escape(label)+'</small></div>';
+    +'<b class="hr-name">'+escape(railName(node))+'</b><small class="hr-state">'+(RAIL_ICONS[state]||'')+escape(label)+(working?elapsedHTML(term):'')+'</small></div>';
 }
 const railLink=link=>'<span class="hr-link" data-kind="'+escape(link.kind)+'" aria-hidden="true"><svg viewBox="0 0 100 12" preserveAspectRatio="none"><path d="M0 6H100"/></svg><i class="hr-head"></i><i class="hr-packet"></i></span>';
 function railRow(nodes,links,hidden=0,hiddenAt=-1,key=''){
@@ -1491,10 +1508,11 @@ function renderAgentActivity(term,room) {
   const taskLabel=task?'<small>'+escape(snippet(task,95))+'</small>':'';
   const panel=room?group:activity;
   panel.dataset.state=state;
-  if(room)setPanel('#groupActivity',icon+'<span role="status">'+escape(label)+taskLabel+'</span>');
+  const since=moving?elapsedHTML(actor):'';
+  if(room)setPanel('#groupActivity',icon+'<span role="status">'+escape(label)+since+taskLabel+'</span>');
   else{
     setPanel('#activitySheep',icon);
-    setPanel('#agentActivityText',escape(label)+taskLabel);
+    setPanel('#agentActivityText',escape(label)+since+taskLabel);
   }
   panel.hidden=false;
 }
