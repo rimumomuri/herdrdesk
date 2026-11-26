@@ -26,3 +26,8 @@ test('code keeps its indentation and fenced blocks are left alone', () => {
 test('inline code is never split', () => {
   assert.equal(readableBody("Run `python -c \"print('Hello! world')\"` now. Next"), "Run `python -c \"print('Hello! world')\"` now.\nNext");
 });
+
+test('a fence closes only with a matching marker, so nested examples stay whole', () => {
+  const text = '````md\n```js\nconsole.log("Hello! world");\n```\nstill code. here\n````\nDone. Next';
+  assert.equal(readableBody(text), '````md\n```js\nconsole.log("Hello! world");\n```\nstill code. here\n````\nDone.\nNext');
+});
