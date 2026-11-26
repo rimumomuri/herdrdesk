@@ -15,9 +15,10 @@ export function computerRows(profiles = [], liveMachines = [], terms = [], isWor
     // card workers on this computer: `used` are running now; `parked` finished but still hold a seat until retired
     const seated = terms.filter(term => term.state === 'live' && term.labels?.['task.spawned'] === '1'
       && (term.machine || 'local') === profile.name);
-    const used = seated.filter(isWorking).length;
+    // The board knows which workers hold a card (also between their turns); without it, count running turns.
+    const used = Number.isInteger(profile.used) && profile.used >= 0 ? profile.used : seated.filter(isWorking).length;
     return { name: profile.name, label: profile.label || profile.name, tier: profile.tier || 'heavy', slots: profile.slots || 0,
-             used, parked: seated.length - used, ready: !!profile.ready, connected, editable, main: profile.name === 'local',
+             used, parked: Math.max(0, seated.length - used), ready: !!profile.ready, connected, editable, main: profile.name === 'local',
              projects: profile.projects === '*' ? '*' : (profile.projects || {}), rolesOff: profile.rolesOff || {}, repos: profile.repos || {},
              state: !connected ? (machineTrouble({ state: live.get(profile.name) }) === 'login' ? 'needs-login' : 'offline') : profile.ready ? 'ready' : 'not-ready' };
   });
