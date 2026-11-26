@@ -79,6 +79,8 @@ public struct HandoffEdge: Codable {
     public var lineageId: String?
     /// When the receiver answered it (a reply card). Kept on the edge: cards are capped and pruned.
     public var answeredAt: Double? = nil
+    /// A message from the sender right after this closed. If the receiver starts working on it, the handoff reopens.
+    public var followUpAt: Double? = nil
     var isOpen: Bool { ["open", "weak", "unconfirmed"].contains(state) }
 }
 
@@ -135,6 +137,8 @@ public final class HandoffBook {
         if m.from != .desk, let i = edges.lastIndex(where: { !$0.isOpen && $0.from.same(m.from) && $0.to.same(m.to) }),
            let ended = edges[i].closedAt, m.at >= ended - Self.mergeWindow, m.at - ended <= Self.mergeWindow {
             _ = addCard(edges[i], at: m.at, kind: "message", from: m.from, to: m.to, body: body)
+            edges[i].followUpAt = m.at
+            edges[i].summary = body
             return
         }
         // The first answer to something the other side handed over (and that really finished) joins it:
@@ -156,6 +160,16 @@ public final class HandoffBook {
     }
 
     public func observe(_ s: HandoffSignals, now: Double) {
+        // "Keep going" sent right after a result is a new instruction once the receiver starts on it; a thanks is not.
+        for i in edges.indices where edges[i].state == "closed" {
+            guard let follow = edges[i].followUpAt else { continue }
+            let to = edges[i].to.address
+            if now - follow > Self.weakAfter { edges[i].followUpAt = nil; continue }
+            guard s.status[to] == "working", s.statusSince[to].map({ $0 >= follow }) ?? true,
+                  edges[i].to.session.isEmpty || s.session[to] == nil || s.session[to] == edges[i].to.session else { continue }
+            edges[i].state = "open"; edges[i].closedAt = nil; edges[i].returnedAt = nil
+            edges[i].workedSinceOpen = true; edges[i].updatedAt = follow; edges[i].followUpAt = nil
+        }
         for i in edges.indices where edges[i].isOpen {
             var e = edges[i]
             defer { edges[i] = e }
