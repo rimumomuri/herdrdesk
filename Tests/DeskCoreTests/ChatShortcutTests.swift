@@ -21,6 +21,46 @@ final class ChatShortcutTests: XCTestCase {
         XCTAssertNil(ChatShortcut.destination(shortcut("//some-other-computer/path")))
     }
 
+    func testWebPagesOpenInTheBrowserAndMarkdownOpensInTheApp() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        func make(_ name: String) throws -> URL {
+            let file = directory.appendingPathComponent(name)
+            try Data("x".utf8).write(to: file)
+            return file.standardizedFileURL
+        }
+        func shortcut(_ url: URL) -> URL {
+            URL(string: "herdrdesk-path:" + url.path.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!)!
+        }
+        for name in ["map.html", "Page.HTM"] {
+            let file = try make(name)
+            XCTAssertEqual(ChatShortcut.destination(shortcut(file)), .browser(file))
+        }
+        for name in ["plan.md", "NOTES.markdown"] {
+            let file = try make(name)
+            XCTAssertEqual(ChatShortcut.destination(shortcut(file)), .markdown(file))
+        }
+        let other = try make("data.csv")
+        XCTAssertEqual(ChatShortcut.destination(shortcut(other)), .reveal(other))
+        let link = directory.appendingPathComponent("link.html")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: try make("real.html"))
+        XCTAssertEqual(ChatShortcut.destination(shortcut(link)), .reveal(link.standardizedFileURL))
+    }
+
+    func testMarkdownTextIsReadOnlyWhenSmallAndUTF8() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("plan.md")
+        try Data("# 계획\n".utf8).write(to: file)
+        XCTAssertEqual(ChatShortcut.markdownText(file), "# 계획\n")
+        try Data(repeating: 0x61, count: ChatShortcut.markdownLimit + 1).write(to: file)
+        XCTAssertNil(ChatShortcut.markdownText(file))
+        try Data([0xFF, 0xFE, 0x00]).write(to: file)
+        XCTAssertNil(ChatShortcut.markdownText(file))
+    }
+
     func testOnlyHTTPAndHTTPSCanOpenInTheBrowser() {
         let site = URL(string: "https://github.com/example")!
         XCTAssertEqual(ChatShortcut.destination(site), .website(site))

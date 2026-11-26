@@ -1278,6 +1278,23 @@ main[data-page=conversations] .feed-row[data-transfer] { max-width:min(100%,880p
 button.computer-row { width:100%; padding:2px 4px; margin:0 -4px; border:0; border-radius:5px; background:none; font:inherit; text-align:left; cursor:pointer }
 button.computer-row:hover, button.computer-row:focus-visible { background:#ffffff0f }
 .computer-dialog { width:min(460px,calc(100vw - 32px)); max-height:calc(100vh - 48px); overflow:auto; padding:16px 18px; border:1px solid var(--line); border-radius:10px; background:#1c1c21; color:var(--ink) }
+.document-dialog { width:min(820px,calc(100vw - 48px)); height:calc(100vh - 64px); padding:0; border:1px solid var(--line); border-radius:10px; background:#1c1c21; color:var(--ink); flex-direction:column }
+.document-dialog[open] { display:flex }
+.document-dialog::backdrop { background:#0707088c }
+.document-dialog header { display:flex; gap:12px; align-items:flex-start; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--line) }
+.document-dialog header div { min-width:0 }
+.document-dialog header button { flex-shrink:0; white-space:nowrap }
+.document-dialog h2 { margin:0; font-size:15px; overflow-wrap:anywhere }
+.document-dialog header p { margin:2px 0 0; font-size:11px; color:var(--muted); overflow-wrap:anywhere }
+.md-document { flex:1; overflow:auto; padding:8px 22px 24px; line-height:1.6; font-size:13.5px }
+.md-document h1,.md-document h2,.md-document h3,.md-document h4,.md-document h5,.md-document h6 { margin:1.1em 0 .4em; line-height:1.3 }
+.md-document h1 { font-size:20px } .md-document h2 { font-size:17px } .md-document h3 { font-size:15px } .md-document h4,.md-document h5,.md-document h6 { font-size:13.5px }
+.md-document ul,.md-document ol { margin:.4em 0; padding-inline-start:22px }
+.md-document li { white-space:pre-wrap }
+.md-document blockquote { margin:.6em 0; padding:0 12px; border-inline-start:3px solid #52525b; color:var(--muted) }
+.md-document pre { margin:.6em 0; padding:10px 12px; background:#141418; border-radius:6px; overflow:auto }
+.md-document pre code { background:none; padding:0; white-space:pre }
+.md-document hr { border:0; border-top:1px solid var(--line); margin:1em 0 }
 .computer-dialog::backdrop { background:#0707088c }
 .computer-dialog h2 { margin:0 0 4px; font-size:15px }
 .computer-dialog h3 { margin:14px 0 6px; font-size:11px; font-weight:650; color:var(--muted) }

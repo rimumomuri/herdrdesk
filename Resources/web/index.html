@@ -96,6 +96,10 @@
  <p id="computerMessage" class="computer-status" role="status"></p>
  <div class="computer-actions"><button id="computerClose" type="button" data-copy="close"></button></div>
 </dialog>
+<dialog id="documentDialog" class="document-dialog" aria-labelledby="documentTitle">
+ <header><div><h2 id="documentTitle"></h2><p id="documentPath"></p></div><button id="documentClose" type="button" data-copy="close"></button></header>
+ <article id="documentBody" class="chat-message-body md-document"></article>
+</dialog>
 <dialog id="chatSectionDialog" class="chat-section-dialog" aria-labelledby="chatSectionTitle">
  <form id="chatSectionForm">
   <h2 id="chatSectionTitle" data-copy="newChatSection"></h2>

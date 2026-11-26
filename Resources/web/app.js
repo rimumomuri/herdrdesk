@@ -1,5 +1,6 @@
 import { chatImageMarkup, ChatImagePreviews, chatImageHistory } from './chat-images.js';
 import { chatMarkdownBlocks } from './chat-markdown.js';
+import { markdownDocumentHTML } from './md-view.js';
 import { waitingInboxItems, waitingInboxMarkup } from './waiting-inbox.js';
 import { lineageMarkup, linkedWaiting } from './lineage.js';
 import { chatShortcutSegments } from './chat-shortcuts.js';
@@ -2565,7 +2566,17 @@ $('#computerSheet').addEventListener('click',event=>{
     if(!result.ok)button.disabled=false;
   });
 });
+$('#documentClose').addEventListener('click',()=>$('#documentDialog').close());
+function showDocument(doc){
+  const dialog=$('#documentDialog');
+  $('#documentTitle').textContent=doc?.name||'';
+  $('#documentPath').textContent=doc?.path||'';
+  $('#documentBody').innerHTML=markdownDocumentHTML(doc?.text||'',renderChatInline,escape,String(doc?.path||'').replace(/\/[^/]*$/,''));
+  $('#documentBody').scrollTop=0;
+  if(!dialog.open)dialog.showModal();
+}
 window.desk={
+  showDocument,
   openCompanionTarget(){
     const target=companionTarget&&inventory.find(term=>term.address===companionTarget.address&&term.session===companionTarget.session);
     if(!target)return;
