@@ -72,6 +72,11 @@ final class CompanionTests: XCTestCase {
         XCTAssertEqual(face?["style"] as? String, "lamb")
         XCTAssertEqual(face?["working"] as? Bool, true)
         XCTAssertNil(face?["name"])
+        XCTAssertEqual(face?["kind"] as? String, "lead")
+        let lead = CompanionLayout.pageState(["mood": "working", "face": ["provider": "codex", "kind": "agent",
+            "mouth": ["codex", "claude", "<b>", 3, "codex", "codex", "codex", "codex", "codex", "codex", "codex", "codex"]]])?["face"] as? [String: Any]
+        XCTAssertEqual(lead?["kind"] as? String, "agent")
+        XCTAssertEqual(lead?["mouth"] as? [String], ["codex", "claude", "codex", "codex", "codex", "codex", "codex"])   // first nine, known engines only
         XCTAssertNil(CompanionLayout.pageState(["mood": "working", "face": ["provider": "<script>"]])?["face"] as? [String: Any])
         XCTAssertNil(CompanionLayout.pageState(["mood": "working", "face": ["provider": "codex", "style": "\"><img>"]])?["face"] as? [String: Any])
         XCTAssertNil(CompanionLayout.pageState(["mood": "working"])?["face"] as? [String: Any])

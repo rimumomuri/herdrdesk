@@ -6,6 +6,7 @@ import { lineageMarkup, linkedWaiting } from './lineage.js';
 import { chatShortcutSegments } from './chat-shortcuts.js';
 import { portraitArtwork, withWorkTool, sheepStyles, sheepCoats, resolveSheepStyle, sheepAccessories, resolveSheepAccessory } from "./portrait.js";
 import { roleLook } from './role-look.js';
+import { leadFaceHTML, agentFaceHTML, isCardWorker } from './herd-face.js';
 import { t, languageFrom } from './locale.js';
 import { shortRoleTitle, nextKey, chatHidden, foldLeadChats, inRoomConversation, groupRows, moveChat, moveSection, toggleSection, addSection, renameSection, deleteSection } from './chat-sections.js';
 import { buildChain, handoffCardsFor, handoffCardHTML, isDelegating } from './handoff-chain.js';
@@ -114,9 +115,9 @@ function companionAttention(){
 }
 /** The agent's own character for the companion: provider and chosen look, never names or text. Null when it has none. */
 function companionPortrait(term,mood){
-  const provider=portraitProvider(term), character=term&&lookOf(term);
-  if(!provider&&!character)return null;
-  return {provider:provider||'neutral',style:character?.style||'classic',coat:character?.coat||'cream',accessory:character?.accessory||'none',
+  const provider=portraitProvider(term);
+  if(!provider)return null;
+  return {provider,kind:isCardWorker(term.labels)?'agent':'lead',mouth:mouthOf(term),
     sleeping:mood==='idle'||mood==='offline',working:mood!=='attention'&&workingNow(term)};
 }
 function pushCompanion(){
@@ -298,14 +299,37 @@ const characterID=term=>{
   const role=legacyDraftKey(term);
   return role&&(characterRoles.get(role)||0)<2?'role:'+role:sessionKey(term);
 };
-const canCustomize=term=>Boolean(term?.program?.agent||portraitProvider(term)||characters.has(characterID(term)));
+// The herd faces follow the engine and the handoffs, so there is no look to pick any more.
+const canCustomize=()=>false;
+// A card worker is its engine's character. Anyone else is a sheep that keeps its mouth closed, opens it to hold
+// the agents it has handed work to (until they hand it back), and sleeps when idle.
 function agentPortrait(term, moving=false, preview=false, working=false) {
   const provider=portraitProvider(term);
-  const character=lookOf(term);
-  if(!provider&&!character)return '';
-  const art=portraitArtwork(provider||'neutral',moving&&!document.hidden&&!motionPreference.matches,character?.style,character?.coat,preview,character?.accessory,!(working||moving||busyNow(term)));
-  const shown=working?withWorkTool(art):art;
-  return shown;
+  if(!provider)return '';
+  const resting=!(working||moving||busyNow(term));
+  let art;
+  if(isCardWorker(term.labels))art=agentFaceHTML({engine:provider,resting});
+  else{ const mouth=mouthOf(term); art=leadFaceHTML({engine:provider,mouth,resting,fresh:freshMouth(term,mouth.length),working:!resting,motion:!motionPreference.matches}); }
+  return working?withWorkTool(art):art;
+}
+/** The agents this one handed work to and has not had back (confirmed handoffs only), with their engines. */
+function mouthTargets(term){
+  if(!term||snapshot.connection!=='live')return [];
+  const seen=new Set();
+  return (snapshot.handoffs?.edges||[]).filter(edge=>edge.state==='open'&&edge.from?.address===term.address&&(!edge.from.session||!term.session||edge.from.session===term.session)
+      &&edge.to?.address&&edge.to.address!=='desk'&&!seen.has(edge.to.address)&&seen.add(edge.to.address))
+    .map(edge=>({address:edge.to.address,engine:portraitProvider(inventory.find(item=>item.address===edge.to.address))||'codex'}));
+}
+const mouthOf=term=>mouthTargets(term).map(target=>target.engine);
+// How many agents just went into a mouth (for 3.2s), so only those play the swallow motion. The first look plays none.
+const mouthMemory=new Map();
+const freshMouth=(term,count)=>freshMouthFor(sessionKey(term),count);
+function freshMouthFor(key,count){
+  const was=mouthMemory.get(key), now=Date.now();
+  if(!was){mouthMemory.set(key,{count,fresh:0,until:0});return 0;}
+  if(count>was.count){was.fresh=count-was.count;was.until=now+3200;}
+  was.count=count;
+  return now<was.until?Math.min(was.fresh,count):0;
 }
 const busyNow=term=>workingNow(term)&&!needsAttention(term);
 const assignmentActive=term=>Boolean(term && (assignmentMotion.get(sessionKey(term))||0)>Date.now());
@@ -543,6 +567,14 @@ function teamEmblem(room,roster=roomRoster(room)){
   const recent=new Map([...characters.keys()].map((key,index)=>[key,index+1]));
   const score=member=>recent.get(characterID(member))||0;
   const lead=roster.find(member=>member.isLead||(room.lead&&legacyDraftKey(member)===room.lead));
+  if(lead&&portraitProvider(lead)){
+    // The team as one sheep: its lead, holding the team's live card workers (and anyone it handed work to) in its mouth.
+    const inside=new Map(mouthTargets(lead).map(target=>[target.address,target.engine]));
+    for(const member of roster)if(member!==lead&&member.state==='live'&&isCardWorker(member.labels)&&!inside.has(member.address))inside.set(member.address,portraitProvider(member)||'codex');
+    const mouth=[...inside.values()], working=busyNow(lead);
+    const art=leadFaceHTML({engine:portraitProvider(lead),mouth,resting:!working,fresh:freshMouthFor('emblem:'+room.id,mouth.length),working,motion:!motionPreference.matches});
+    return '<span class="team-emblem" data-members="1" data-herd aria-hidden="true"><span>'+(working?withWorkTool(art):art)+'</span></span>';
+  }
   const ranked=roster.filter(member=>member!==lead).sort((a,b)=>score(b)-score(a));
   const faces=(lead?[lead,...ranked]:ranked).slice(0,3);
   return '<span class="team-emblem" data-members="'+Math.max(1,faces.length)+'" aria-hidden="true">'
@@ -1345,7 +1377,7 @@ function railNode(node){
   // One label: working now (handoff or terminal), waiting on someone named, or the handoff state.
   const working=node.state==='working'||node.sessionActivity==='working';
   const state=working?'working':node.state;
-  const face=node.address==='desk'?avatar(copy('you')):(term&&agentPortrait(term,working))||portraitArtwork('neutral',false);
+  const face=node.address==='desk'?avatar(copy('you')):(term&&agentPortrait(term,working))||leadFaceHTML({engine:'neutral',resting:true});
   const label=working?copy('flowWorking'):state==='waiting'&&node.waitingFor?copy('flowWaitingFor').replace('{name}',()=>railName({address:node.waitingFor,role:''})):copy('chainState_'+state);
   return '<div class="hr-node" data-state="'+escape(state)+'"'+(node.address==='desk'?' data-desk':'')+(node.sessionActivity?' data-activity="'+escape(node.sessionActivity)+'"':'')+'><span class="hr-face">'+face+(working?RAIL_HAMMER:'')+'</span>'
     +'<b class="hr-name">'+escape(railName(node))+'</b><small class="hr-state">'+(RAIL_ICONS[state]||'')+escape(label)+'</small></div>';
@@ -1363,7 +1395,7 @@ function railRow(nodes,links,hidden=0,hiddenAt=-1,key=''){
 function railPortrait(party){
   if(party.address==='desk')return avatar(copy('you'));
   const term=inventory.find(item=>item.address===party.address&&(!party.session||item.session===party.session));
-  return (term&&agentPortrait(term))||portraitArtwork('neutral',false);
+  return (term&&agentPortrait(term))||leadFaceHTML({engine:'neutral',resting:true});
 }
 const chatHandoffCard=card=>handoffCardHTML(card,railName,railPortrait,escape,copy,time);
 
