@@ -34,6 +34,18 @@ Core discovery works without a team configuration. If your Herdr terminal alread
 
 The card board shown in the demo is optional. It appears when you provide an external `herdr-task` command, described in [configuration](docs/configuration.md#optional-card-board-and-computer-list). The same command can also back a settings sheet for each computer (turn work on or off, set the worker count, clone a project onto another Mac): see [computer settings sheet](docs/configuration.md#computer-settings-sheet).
 
+## What you see
+
+<img src="Resources/web/icons/herd-leads-v1.png" width="300" alt="Lead characters: Claude, Codex and mixed leads with mouth closed, asleep and open">&nbsp;<img src="Resources/web/icons/herd-agents-v1.png" width="200" alt="Worker characters: Claude and Codex">
+
+- **Agents as characters.** A team lead is a sheep. It keeps its mouth closed, sleeps when idle, and opens its mouth to hold the agents it has handed work to (Claude or Codex) until they hand the result back. Its ring is orange for a Claude lead and violet for a Codex lead, and blends when the mouth holds both. The sidebar's team icon is the lead holding the team's workers. A worker spawned for a task card is simply its engine's character.
+- **Motion that means something.** A working agent bobs with a hammer and glows in its colour, and a light runs around a lead's ring, faster while it works. Hover a face to make it hop. Motion stops when macOS *Reduce motion* is on.
+- **Team flows.** Above the composer, a team room shows every flow running in the team, one row each: who handed work to whom, who is working now and who is waiting on whom. While someone works on a handoff, light runs down the arrow and is absorbed into them. A direct conversation shows that agent's own chain.
+- **Working time.** Every working status shows how long the agent has been at it, as the terminal does (*Working now · 3m 12s*), in the sidebar, the member list, the activity line and the rail.
+- **Questions and approvals.** An agent's registered question is answered in the conversation, with its choices; an approval opens the right Herdr terminal.
+- **Files in replies.** A link to a saved web page opens in your default browser; a Markdown file opens in an in-app viewer.
+- **Floating companion.** A small character outside the window (also over full-screen video) shows who needs you and who is working. Click it to open HerdrDesk.
+
 ## Privacy
 
 Core is accessed locally and through the remote connections already configured in Herdr. HerdrDesk does not run a cloud service. Terminal output is streamed for the selected session, discarded when observation ends and excluded from saved chat history. Outgoing drafts and local send records are stored on the Mac.
