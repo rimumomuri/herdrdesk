@@ -54,3 +54,17 @@ test('a long chain folded for display is still one flow', () => {
   assert.equal(flows.length, 1);
   assert.ok(flows[0].hidden > 0);
 });
+
+test('two flows into the same worker show the worker once; the other sender still says who it waits for', () => {
+  const { flows } = teamFlows({ edges: [edge(lead, qa, 'open', now - 10_000), edge(prod, qa, 'open', now - 20_000)] }, team, status({ t3: 'working' }), now);
+  assert.deepEqual(flows.map(addresses), [['t1', 't3'], ['t2']]);
+  assert.equal(flows[1].nodes[0].waitingFor, 't3');
+});
+
+test('folding a long chain does not change who a node waits for', () => {
+  const chainOf = Array.from({ length: 8 }, (_, i) => p('t' + (10 + i), 'r' + i));
+  const edges = chainOf.slice(1).map((to, i) => edge(chainOf[i], to));
+  const { flows } = teamFlows({ edges }, chainOf, status({ t17: 'working' }), now);
+  assert.equal(flows[0].nodes[1].address, 't11');
+  assert.equal(flows[0].nodes[1].waitingFor, 't12');
+});

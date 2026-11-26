@@ -171,6 +171,7 @@ public final class HandoffBook {
                   edges[i].to.session.isEmpty || s.session[to] == nil || s.session[to] == edges[i].to.session else { continue }
             edges[i].state = "open"; edges[i].closedAt = nil; edges[i].returnedAt = nil
             edges[i].workedSinceOpen = true; edges[i].updatedAt = follow; edges[i].followUpAt = nil; edges[i].reopenedAt = follow
+            edges[i].answeredAt = nil; edges[i].pendingReplyAt = nil; edges[i].pendingCardId = nil; edges[i].busyAfterReply = nil   // the follow-up waits for its own answer
         }
         for i in edges.indices where edges[i].isOpen {
             var e = edges[i]

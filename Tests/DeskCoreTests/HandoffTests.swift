@@ -73,6 +73,23 @@ final class HandoffTests: XCTestCase {
         XCTAssertEqual(book.edges[0].state, "closed")   // a new result for the follow-up still closes it
     }
 
+    func testResultOfAReopenedFollowUpIsTheAnswerNotANewHandoff() {
+        let book = HandoffBook()
+        book.record(msg(lead, prod, t0))
+        book.observe(signals(["t2":"working"]), now: t0 + 1_000)
+        book.record(msg(prod, lead, t0 + 30_000, "first result"))
+        book.observe(signals(["t2":"idle"]), now: t0 + 31_000)
+        XCTAssertNotNil(book.edges[0].answeredAt)
+        book.record(msg(lead, prod, t0 + 60_000, "keep going"))
+        var again = signals(["t2":"working"]); again.statusSince = ["t2": t0 + 61_000]
+        book.observe(again, now: t0 + 62_000)
+        XCTAssertEqual(book.edges[0].state, "open")
+        book.observe(signals(["t2":"idle"]), now: t0 + 90_000)
+        book.record(msg(prod, lead, t0 + 89_000, "second result"))
+        XCTAssertEqual(book.edges.count, 1)
+        XCTAssertEqual(book.cards.last?.kind, "reply")
+    }
+
     func testAcknowledgementDoesNotReopenWhenReceiverStaysIdle() {
         let book = HandoffBook()
         book.record(msg(lead, prod, t0))

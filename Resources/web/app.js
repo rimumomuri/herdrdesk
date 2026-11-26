@@ -1393,7 +1393,7 @@ function renderHandoffRail(term,room){
     ({flows:chains,hidden}=teamFlows(snapshot.handoffs,members,railStatus,Date.now(),{limit:expanded?20:3,collapse:!expanded}));
   }else{
     const chain=buildChain(snapshot.handoffs,{address:term.address,session:term.session,role:legacyDraftKey(term)},railStatus,Date.now(),{collapse:!expanded});
-    if(chain)chains=[markWaiting(chain)];
+    if(chain)chains=[markWaiting(chain,snapshot.handoffs?.edges||[])];
   }
   if(!chains.length){rail.hidden=true;setPanel('#handoffRail','');return false;}
   const nodes=chains.flatMap(chain=>[...chain.nodes,...chain.branches.flatMap(branch=>branch.nodes)]);
