@@ -7,6 +7,9 @@ import { agentTrouble } from './trouble.js';
 export const DEFAULT_SOUNDS = { done: 'Glass', handoff: 'Pop', attention: 'Ping' };
 export const ATTENTION_EVERY = 60_000;
 
+/** A finished turn rings for everyone, or only for team leads when the person chose so (workers stay quiet). */
+export const playsDoneSound = (term, leadsOnly) => !leadsOnly || Boolean(term?.isLead);
+
 /** New "assign" handoff cards since the last call; the first call only remembers what is already there. */
 export function newHandoffs(cards = [], seen = null) {
   const ids = new Set(cards.filter(card => card.kind === 'assign').map(card => card.id));

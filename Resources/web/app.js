@@ -12,7 +12,7 @@ import { shortRoleTitle, nextKey, chatHidden, foldLeadChats, inRoomConversation,
 import { buildChain, handoffCardsFor, handoffCardHTML, isDelegating } from './handoff-chain.js';
 import { teamFlows, markWaiting } from './team-flow.js';
 import { messageTag, awaitingResponse, tagHTML } from './message-tags.js';
-import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick } from './sound-rules.js';
+import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick, playsDoneSound } from './sound-rules.js';
 import { sheep } from './sheep.js';
 import { companionState, companionSummary, featuredAgent } from './companion.js';
 import { agentTrouble, machineTrouble } from './trouble.js';
@@ -105,7 +105,7 @@ function checkAttention(){
 setInterval(checkAttention,5000);
 // The floating companion sheep: same signals as the sounds; Swift shows it only while HerdrDesk is in the background.
 let companionFlash=null, companionTarget=null, companionSignature='', companionFinished=null, companionFace=null;
-const companionSettings={enabled:load('ui.companion.v1',true)!==false, attentionOnly:load('ui.companionAttentionOnly.v1',false)===true};
+const companionSettings={enabled:load('ui.companion.v1',true)!==false, attentionOnly:load('ui.companionAttentionOnly.v1',false)===true, leadsDoneOnly:load('ui.soundLeadsDoneOnly.v1',false)===true};
 function companionAttention(){
   const byAddress=new Map(inventory.filter(term=>term.state==='live').map(term=>[term.address,term]));
   const item=term=>({address:term.address,session:term.session,team:term.team||term.label||term.address});
@@ -139,7 +139,7 @@ function pushCompanion(){
   post({type:'companion',state:message});
 }
 setInterval(pushCompanion,2000);
-for(const [id,key,field] of [['#companionEnabled','ui.companion.v1','enabled'],['#companionAttentionOnly','ui.companionAttentionOnly.v1','attentionOnly']]){
+for(const [id,key,field] of [['#companionEnabled','ui.companion.v1','enabled'],['#companionAttentionOnly','ui.companionAttentionOnly.v1','attentionOnly'],['#soundLeadsDoneOnly','ui.soundLeadsDoneOnly.v1','leadsDoneOnly']]){
   $(id).checked=companionSettings[field];
   $(id).addEventListener('change',event=>{companionSettings[field]=event.target.checked;save(key,event.target.checked);pushCompanion();});
 }
@@ -2700,18 +2700,18 @@ window.desk={
       .filter(node=>node.term).map(node=>[sessionKey(node.term),group])));
     flowEntries=explicitHandoffs(inventory);
     const nextSoundStates=new Map();
-    let didComplete=false;
+    let didComplete=false, doneSound=false;
     if(payload.connection==='live'){
       for(const term of inventory){
         if(term.state!=='live'||!term.program?.agent||!term.session)continue;
         const key=sessionKey(term), before=soundStates.get(key);
         const wasWorking=term.status==='working'||(term.status==='blocked'&&before?.wasWorking);
         nextSoundStates.set(key,{status:term.status,wasWorking,turn:term.turn,statusMs:term.statusMs});
-        if(completedAgentTurn(before,term)){didComplete=true;companionFinished=key;}
+        if(completedAgentTurn(before,term)){didComplete=true;companionFinished=key;if(playsDoneSound(term,companionSettings.leadsDoneOnly))doneSound=true;}
       }
     }
     soundStates=nextSoundStates;
-    if(didComplete){playSystem('done');companionFlash={kind:'done',at:Date.now()};}
+    if(didComplete){if(doneSound)playSystem('done');companionFlash={kind:'done',at:Date.now()};}
     recordHandoffs();
     fillSoundPicks(payload.systemSounds||[]);
     const handoffs=newHandoffs(payload.handoffs?.cards||[],handoffSeen);

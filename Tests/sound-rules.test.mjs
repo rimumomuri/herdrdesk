@@ -45,3 +45,11 @@ test('an agent that needs a login keeps ringing like a blocked one; a usage limi
   const limit = {address:'t4', session:'4', state:'live', program:{agent:true}, status:'error', statusMessage:'usage limit reached'};
   assert.deepEqual([...attentionKeys([login, limit], [])], ['login:t3:3']);
 });
+
+test('with "leads only", a finished turn rings only for team leads', async () => {
+  const { playsDoneSound } = await import('../Resources/web/sound-rules.js');
+  assert.equal(playsDoneSound({ isLead: false }, false), true);
+  assert.equal(playsDoneSound({ isLead: true }, true), true);
+  assert.equal(playsDoneSound({ isLead: false }, true), false);
+  assert.equal(playsDoneSound({}, true), false);
+});
