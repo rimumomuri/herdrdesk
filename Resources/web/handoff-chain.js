@@ -109,12 +109,14 @@ import { messageTag, tagHTML } from './message-tags.js';
 const CARD_BADGE = { assign: 'cardAssign', reply: 'cardReply', progress: 'cardProgress', message: 'cardMessage', pending: 'cardMessage' };
 
 /** A dense report as one sentence per line: break after 。．！？ and after . ! ? followed by a space. Dots inside
- *  numbers, file names and links stay. No rewording, no summary. */
+ *  numbers, file names and links stay; code (fenced or indented) and indentation stay as written. No rewording. */
 export function readableBody(text) {
-  return String(text ?? '')
-    .replace(/([。．！？])[ \t]*(?=\S)/g, '$1\n')
-    .replace(/([.!?])[ \t]+(?=\S)/g, '$1\n')
-    .replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{2,}/g, '\n');
+  let fence = false;
+  return String(text ?? '').split('\n').map(line => {
+    if (/^ {0,3}(```|~~~)/.test(line)) { fence = !fence; return line; }
+    if (fence || /^( {4}|\t)/.test(line)) return line;
+    return line.replace(/([。．！？])[ \t]*(?=\S)/g, '$1\n').replace(/([.!?])[ \t]+(?=\S)/g, '$1\n');
+  }).join('\n');
 }
 
 /** One handoff card for the chat: sender → receiver, badge, time, first two lines of the body. */

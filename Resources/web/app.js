@@ -113,8 +113,16 @@ function observeChatImages(){
   imageObserver.disconnect();
   for(const element of document.querySelectorAll('[data-chat-preview]'))imageObserver.observe(element);
 }
+// Images just sent (previews kept in this page) get a viewer group of their own, stable per message so screens that
+// compare HTML do not redraw; there is no file behind them, so the viewer shows the thumbnail.
+const sentViewerTokens=new Map();
+function sentViewerToken(entry){
+  const key=String(entry.id||'');
+  if(!sentViewerTokens.has(key))sentViewerTokens.set(key,'image'+(800000000+sentViewerTokens.size));
+  return sentViewerTokens.get(key);
+}
 function messageImages(entry){
-  if(Array.isArray(entry.previews))return chatImageMarkup(entry.previews);
+  if(Array.isArray(entry.previews))return chatImageMarkup(entry.previews,sentViewerToken(entry));
   const previewRole=entry.role?.startsWith('session:')?entry.address:(entry.role||entry.address);
   const record=(entry.images>0&&previewRole&&entry.session)?{id:entry.id,role:previewRole,session:entry.session,body:entry.imageBody??entry.text??entry.body??'',sentImages:true}:conversationRecords().find(record=>record.id===entry.id&&record.body===(entry.body??entry.text));
   return imagePreviews.markup(record);

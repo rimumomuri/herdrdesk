@@ -17,3 +17,8 @@ test('existing line breaks stay and no blank lines pile up', () => {
   assert.equal(readableBody('첫 줄.\n둘째 줄。 셋째'), '첫 줄.\n둘째 줄。\n셋째');
   assert.equal(readableBody(''), '');
 });
+
+test('code keeps its indentation and fenced blocks are left alone', () => {
+  assert.equal(readableBody('Run this. Then:\nif ready:\n    deploy()'), 'Run this.\nThen:\nif ready:\n    deploy()');
+  assert.equal(readableBody('```\na. b. c\n```\nDone. Next'), '```\na. b. c\n```\nDone.\nNext');
+});
