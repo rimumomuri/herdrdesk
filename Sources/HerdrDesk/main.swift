@@ -905,6 +905,17 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
             if !NSWorkspace.shared.open(link) { call("window.desk.notice(key)", ["key": "shortcutOpenFailed"]) }
         case .reveal(let file):
             NSWorkspace.shared.activateFileViewerSelecting([file])
+        case .browser(let file):
+            // A saved page has no reliable default app of its own; use the app that opens web links.
+            guard let browser = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!) else {
+                NSWorkspace.shared.activateFileViewerSelecting([file]); return
+            }
+            NSWorkspace.shared.open([file], withApplicationAt: browser, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+                if error != nil { DispatchQueue.main.async { NSWorkspace.shared.activateFileViewerSelecting([file]) } }
+            }
+        case .markdown(let file):
+            guard let text = ChatShortcut.markdownText(file) else { NSWorkspace.shared.activateFileViewerSelecting([file]); return }
+            call("window.desk.showDocument(doc)", ["doc": ["name": file.lastPathComponent, "path": file.path, "text": text]])
         case nil:
             call("window.desk.notice(key)", ["key": "shortcutOpenFailed"])
         }
