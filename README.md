@@ -2,7 +2,7 @@
 
 HerdrDesk is an independent macOS companion for [Herdr](https://github.com/herdrdev/herdr-app). It groups live terminals by team, space and device, shows a selected terminal live, and lets you send work to a supported coding agent. The main interface is available in English, Korean and Japanese.
 
-![HerdrDesk demo: a team room with its card board, live member status and team messages (synthetic data)](docs/images/demo.gif)
+![HerdrDesk demo: a team room where the lead holds the workers it handed work to, the team flows with working time, and the card board (synthetic data)](docs/images/demo.gif)
 
 ## Install
 
