@@ -36,3 +36,13 @@ test('block quotes and tables', () => {
 test('raw HTML in the document is shown as text', () => {
   assert.equal(html('<script>alert(1)</script>'), '<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>');
 });
+
+test('a hash that belongs to the heading stays; a closing sequence goes', () => {
+  assert.equal(html('# C#\n## Title ##'), '<h1>C#</h1><h2>Title</h2>');
+});
+
+test('relative links resolve against the document folder', () => {
+  const out = markdownDocumentHTML('See [config](docs/config.md), [up](../README.md#top), [web](https://a.b), [abs](/x/y.md), `[c](d.md)`',
+    s => esc(s), esc, '/Users/me/project/notes');
+  assert.equal(out, '<p>See [config](&lt;/Users/me/project/notes/docs/config.md&gt;), [up](&lt;/Users/me/project/README.md&gt;), [web](https://a.b), [abs](/x/y.md), `[c](d.md)`</p>');
+});

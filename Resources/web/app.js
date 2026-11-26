@@ -2571,7 +2571,7 @@ function showDocument(doc){
   const dialog=$('#documentDialog');
   $('#documentTitle').textContent=doc?.name||'';
   $('#documentPath').textContent=doc?.path||'';
-  $('#documentBody').innerHTML=markdownDocumentHTML(doc?.text||'',renderChatInline,escape);
+  $('#documentBody').innerHTML=markdownDocumentHTML(doc?.text||'',renderChatInline,escape,String(doc?.path||'').replace(/\/[^/]*$/,''));
   $('#documentBody').scrollTop=0;
   if(!dialog.open)dialog.showModal();
 }

@@ -9,12 +9,30 @@ function mdCells(line) {
 }
 const mdListItem = /^( *)(?:([-*+])|(\d{1,9})[.)])[ \t]+(.*)$/;
 
-export function markdownDocumentHTML(text, inline, escapeText) {
+// `[label](docs/x.md)` points next to the document; rewrite it to an absolute path the chat shortcuts understand.
+function mdResolveLinks(line, base) {
+  return line.split(/(`[^`\n]*`)/).map((part, index) => index % 2 ? part : part.replace(/\[([^\n\[\]]+)\]\(([^\s()<>]+)\)/g, (whole, label, target) => {
+    if (/^(?:[a-z][\w+.-]*:|\/|~\/|#)/i.test(target)) return whole;
+    let relative = target.replace(/[?#].*$/, '');
+    try { relative = decodeURIComponent(relative); } catch { return whole; }
+    const parts = base.split('/');
+    for (const piece of relative.split('/')) {
+      if (piece === '..') { if (parts.length > 1) parts.pop(); }
+      else if (piece && piece !== '.') parts.push(piece);
+    }
+    const path = parts.join('/');
+    return path.startsWith('/') && !/[<>\n]/.test(path) ? '[' + label + '](<' + path + '>)' : whole;
+  })).join('');
+}
+
+/** `base` is the folder that holds the document, for relative links. */
+export function markdownDocumentHTML(text, renderInline, escapeText, base = '') {
+  const inline = value => renderInline(base ? mdResolveLinks(value, base) : value);
   const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
   const out = [];
   let para = [], quote = [], list = null;
   const flushPara = () => { if (para.length) { out.push('<p>' + inline(para.join('\n')) + '</p>'); para = []; } };
-  const flushQuote = () => { if (quote.length) { out.push('<blockquote>' + markdownDocumentHTML(quote.join('\n'), inline, escapeText) + '</blockquote>'); quote = []; } };
+  const flushQuote = () => { if (quote.length) { out.push('<blockquote>' + markdownDocumentHTML(quote.join('\n'), renderInline, escapeText, base) + '</blockquote>'); quote = []; } };
   const flushList = () => { if (list) { out.push('<' + list.tag + '>' + list.items.join('') + '</' + list.tag + '>'); list = null; } };
   const flush = () => { flushPara(); flushQuote(); flushList(); };
   for (let i = 0; i < lines.length; i++) {
@@ -35,7 +53,7 @@ export function markdownDocumentHTML(text, inline, escapeText) {
     const quoted = line.match(/^ {0,3}> ?(.*)$/);
     if (quoted) { flushPara(); flushList(); quote.push(quoted[1]); continue; }
     flushQuote();
-    const heading = line.match(/^ {0,3}(#{1,6})[ \t]+(.*?)[ \t#]*$/);
+    const heading = line.match(/^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/);
     if (heading) { flush(); out.push('<h' + heading[1].length + '>' + inline(heading[2]) + '</h' + heading[1].length + '>'); continue; }
     if (/^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/.test(line)) { flush(); out.push('<hr>'); continue; }
     const header = mdCells(line), rule = mdCells(lines[i + 1] ?? '');
