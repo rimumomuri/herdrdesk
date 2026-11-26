@@ -22,3 +22,7 @@ test('code keeps its indentation and fenced blocks are left alone', () => {
   assert.equal(readableBody('Run this. Then:\nif ready:\n    deploy()'), 'Run this.\nThen:\nif ready:\n    deploy()');
   assert.equal(readableBody('```\na. b. c\n```\nDone. Next'), '```\na. b. c\n```\nDone.\nNext');
 });
+
+test('inline code is never split', () => {
+  assert.equal(readableBody("Run `python -c \"print('Hello! world')\"` now. Next"), "Run `python -c \"print('Hello! world')\"` now.\nNext");
+});

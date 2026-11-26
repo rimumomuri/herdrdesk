@@ -115,7 +115,9 @@ export function readableBody(text) {
   return String(text ?? '').split('\n').map(line => {
     if (/^ {0,3}(```|~~~)/.test(line)) { fence = !fence; return line; }
     if (fence || /^( {4}|\t)/.test(line)) return line;
-    return line.replace(/([。．！？])[ \t]*(?=\S)/g, '$1\n').replace(/([.!?])[ \t]+(?=\S)/g, '$1\n');
+    // `inline code` stays whole: only the text between code spans is split.
+    return line.split(/(`[^`]*`)/).map((part, index) => index % 2 ? part
+      : part.replace(/([。．！？])[ \t]*(?=\S)/g, '$1\n').replace(/([.!?])[ \t]+(?=\S)/g, '$1\n')).join('');
   }).join('\n');
 }
 
