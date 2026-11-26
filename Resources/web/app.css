@@ -1083,27 +1083,26 @@ main[data-page=conversations] #groupMembers .roster-head { border:0 }
 @keyframes hr-flow { to { stroke-dashoffset:-18 } } @keyframes hr-flowback { to { stroke-dashoffset:18 } }
 @keyframes hr-send { from { left:0; opacity:0 } 15%,85% { opacity:1 } to { left:calc(100% - 14px); opacity:0 } }
 @keyframes hr-return { from { left:calc(100% - 14px); opacity:0 } 15%,85% { opacity:1 } to { left:0; opacity:0 } }
-/* Feeding: the node an arrow points at is working, so light runs down the arrow and is absorbed into its face. */
-.hr-link { --hr-c:var(--hr-weak) } .hr-link[data-kind=go] { --hr-c:var(--hr-go) } .hr-link[data-kind=hold] { --hr-c:var(--hr-hold) }
-.hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working])) path { stroke:var(--hr-c); stroke-dasharray:none; opacity:.9 }
-.hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working])) svg { filter:drop-shadow(0 0 2px var(--hr-c)) drop-shadow(0 0 5px var(--hr-c)) }
-.hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working])) .hr-head { filter:drop-shadow(0 0 3px var(--hr-c)) }
-.hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working]))::after { content:""; position:absolute; top:4px; left:-22px; width:22px; height:6px; border-radius:3px; opacity:0; pointer-events:none;
+/* Feeding: a confirmed handoff (go/hold) points at a working node, so light runs down the arrow and is absorbed into its face. */
+.hr-link[data-kind=go] { --hr-c:var(--hr-go) } .hr-link[data-kind=hold] { --hr-c:var(--hr-hold) }
+.hr-link:is([data-kind=go],[data-kind=hold]):has(+ .hr-node:is([data-state=working],[data-activity=working])) path { stroke:var(--hr-c); stroke-dasharray:none; opacity:.9 }
+.hr-link:is([data-kind=go],[data-kind=hold]):has(+ .hr-node:is([data-state=working],[data-activity=working])) svg { filter:drop-shadow(0 0 2px var(--hr-c)) drop-shadow(0 0 5px var(--hr-c)) }
+.hr-link:is([data-kind=go],[data-kind=hold]):has(+ .hr-node:is([data-state=working],[data-activity=working])) .hr-head { filter:drop-shadow(0 0 3px var(--hr-c)) }
+.hr-link:is([data-kind=go],[data-kind=hold]):has(+ .hr-node:is([data-state=working],[data-activity=working]))::after { content:""; position:absolute; top:4px; left:-22px; width:22px; height:6px; border-radius:3px; opacity:0; pointer-events:none;
   background:linear-gradient(90deg,transparent,var(--hr-c) 50%,#fff 85%); box-shadow:0 0 8px 2px var(--hr-c),0 0 16px 3px var(--hr-c); transform-origin:100% 50% }
-.hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working])) .hr-packet { display:none }
-.hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working])) + .hr-node { --hr-c:var(--hr-weak) }
+.hr-link:is([data-kind=go],[data-kind=hold]):has(+ .hr-node:is([data-state=working],[data-activity=working])) .hr-packet { display:none }
 .hr-link[data-kind=go]:has(+ .hr-node:is([data-state=working],[data-activity=working])) + .hr-node { --hr-c:var(--hr-go) }
 .hr-link[data-kind=hold]:has(+ .hr-node:is([data-state=working],[data-activity=working])) + .hr-node { --hr-c:var(--hr-hold) }
-.hr-link:not([data-kind=back]) + .hr-node:is([data-state=working],[data-activity=working]) .hr-face::before { content:""; position:absolute; inset:2px; border-radius:50%; z-index:-1; pointer-events:none;
+.hr-link:is([data-kind=go],[data-kind=hold]) + .hr-node:is([data-state=working],[data-activity=working]) .hr-face::before { content:""; position:absolute; inset:2px; border-radius:50%; z-index:-1; pointer-events:none;
   background:radial-gradient(circle,var(--hr-c) 0%,transparent 70%); opacity:.35 }
-.hr-link:not([data-kind=back]) + .hr-node:is([data-state=working],[data-activity=working]) .hr-face::after { content:""; position:absolute; inset:1px; border-radius:50%; pointer-events:none;
+.hr-link:is([data-kind=go],[data-kind=hold]) + .hr-node:is([data-state=working],[data-activity=working]) .hr-face::after { content:""; position:absolute; inset:1px; border-radius:50%; pointer-events:none;
   box-shadow:0 0 0 2px var(--hr-c),0 0 10px 2px var(--hr-c); opacity:0 }
 .hr-node[data-activity=working] { opacity:1 }   /* its terminal is running: not faded even before the handoff is confirmed */
-.handoff-rail[data-motion=on] .hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working])) path { animation:none }
-.handoff-rail[data-motion=on] .hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working]))::after { animation:hr-feed 1.4s ease-in infinite }
-.handoff-rail[data-motion=on] .hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working])) .hr-head { animation:hr-head-glow 1.4s linear infinite }
-.handoff-rail[data-motion=on] .hr-link:not([data-kind=back]) + .hr-node:is([data-state=working],[data-activity=working]) .hr-face::before { animation:hr-absorb-glow 1.4s ease-out infinite }
-.handoff-rail[data-motion=on] .hr-link:not([data-kind=back]) + .hr-node:is([data-state=working],[data-activity=working]) .hr-face::after { animation:hr-absorb-ring 1.4s ease-out infinite }
+.handoff-rail[data-motion=on] .hr-link:is([data-kind=go],[data-kind=hold]):has(+ .hr-node:is([data-state=working],[data-activity=working])) path { animation:none }
+.handoff-rail[data-motion=on] .hr-link:is([data-kind=go],[data-kind=hold]):has(+ .hr-node:is([data-state=working],[data-activity=working]))::after { animation:hr-feed 1.4s ease-in infinite }
+.handoff-rail[data-motion=on] .hr-link:is([data-kind=go],[data-kind=hold]):has(+ .hr-node:is([data-state=working],[data-activity=working])) .hr-head { animation:hr-head-glow 1.4s linear infinite }
+.handoff-rail[data-motion=on] .hr-link:is([data-kind=go],[data-kind=hold]) + .hr-node:is([data-state=working],[data-activity=working]) .hr-face::before { animation:hr-absorb-glow 1.4s ease-out infinite }
+.handoff-rail[data-motion=on] .hr-link:is([data-kind=go],[data-kind=hold]) + .hr-node:is([data-state=working],[data-activity=working]) .hr-face::after { animation:hr-absorb-ring 1.4s ease-out infinite }
 @keyframes hr-feed { 0% { left:-22px; opacity:0; transform:scaleX(.5) } 12% { opacity:1 } 68% { left:calc(100% - 22px); opacity:1; transform:scaleX(1) }
   84% { left:calc(100% + 4px); opacity:0; transform:scaleX(.15) } 100% { left:calc(100% + 4px); opacity:0; transform:scaleX(.15) } }
 @keyframes hr-head-glow { 0%,58%,100% { filter:drop-shadow(0 0 3px var(--hr-c)) } 72% { filter:drop-shadow(0 0 7px var(--hr-c)) brightness(1.7) } }
