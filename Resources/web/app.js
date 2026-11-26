@@ -691,7 +691,7 @@ function renderRooms(){
   if(!hidden.length)showHiddenChats=false;
   const hiddenToggle=$('#hiddenChatsToggle');
   hiddenToggle.hidden=!hidden.length;
-  hiddenToggle.textContent=copy('hiddenChats')+(hidden.length?' '+hidden.length:'');
+  hiddenToggle.textContent=copy(showHiddenChats?'hiddenChatsHide':'hiddenChatsShow').replace('{n}',String(hidden.length));
   hiddenToggle.setAttribute('aria-pressed',String(showHiddenChats));
   const shelf=$('#pinnedChats'), focus=document.activeElement?.dataset;
   shelf.hidden=pinned.length===0;

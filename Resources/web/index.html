@@ -10,8 +10,7 @@
 </head>
 <body>
 <header class="top"><span id="connection" role="status"></span><button type="button" id="alertCount" hidden></button><details class="settings"><summary data-copy="settings"></summary><div class="settings-menu">
- <div class="extra-views"><button data-view="conversations" data-copy="conversations" hidden></button><button data-view="overview" data-copy="viewOverview"></button><button data-view="structure" data-copy="viewStructure"></button><button data-view="handoff" data-copy="viewHandoff"></button><button data-view="work" data-copy="viewWork"></button></div>
- <button id="hiddenChatsToggle" type="button" aria-pressed="false" hidden></button>
+ <div class="extra-views"><button data-view="conversations" data-copy="conversations" hidden></button><button data-view="structure" data-copy="viewStructure"></button></div>
  <label for="language" data-copy="language">Language</label><select id="language"><option value="en">English</option><option value="ko">한국어</option><option value="ja">日本語</option></select>
  <label class="sound-toggle"><input id="automaticChat" type="checkbox" checked><span data-copy="automaticChat"></span></label>
  <label class="sound-toggle"><input id="soundEnabled" type="checkbox"><span data-copy="soundEffects"></span></label>
@@ -37,6 +36,7 @@
    <div id="pinDropHint" hidden><span aria-hidden="true">⌖</span> <span data-copy="dropToPin"></span></div>
    <div id="pinnedChats" role="group" hidden></div>
    <div id="roomList" tabindex="0"></div>
+   <button id="hiddenChatsToggle" class="hidden-chats-toggle" type="button" aria-pressed="false" hidden></button>
    <div id="computerStrip" class="computer-strip"></div>
   </aside>
   <section id="directoryPanel" hidden>
