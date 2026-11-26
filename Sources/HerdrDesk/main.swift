@@ -535,6 +535,23 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                     self.call("window.desk.chatImages(payload)",["payload":["token":token,"previews":current == record ? previews : []]])
                 }
             }
+        case "chatImageLarge":
+            // The viewer asks for one image of an already shown agent message at viewer size. Same record binding and
+            // file rules as the thumbnails; sent images (kept only as thumbnails) get nothing and the page keeps its thumbnail.
+            guard let token=field("token",64), let id=field("id",160), let role=field("role",64),
+                  let session=field("session",128), let text=field("body",8192),
+                  let index=body["index"] as? Int, (0..<4).contains(index) else { return }
+            let reply: (String) -> Void = { image in
+                self.call("window.desk.chatImageLarge(payload)",["payload":["token":token,"index":index,"image":image]])
+            }
+            guard let record=chatImageRecord(id:id,role:role,session:session,body:text) else { reply(""); return }
+            attachmentQueue.async {
+                let paths=ChatImagePolicy.references(record.body)
+                let image=index < paths.count ? ChatImagePolicy.largePreview(paths[index])?.base64EncodedString() ?? "" : ""
+                DispatchQueue.main.async {
+                    reply(self.chatImageRecord(id:id,role:role,session:session,body:text) == record ? image : "")
+                }
+            }
         case "attachments", "attach", "detach":
             guard let address = field("address", 160), let session = field("session") else { return }
             let term = target(address: address, session: session)

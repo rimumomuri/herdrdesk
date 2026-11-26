@@ -23,6 +23,8 @@ public struct ChatImageRecord: Equatable {
 public enum ChatImagePolicy {
     public static let maxBytes = 10 * 1024 * 1024
     public static let maxThumbnailBytes = 128 * 1024
+    /// The image viewer's size: big enough to read a screenshot, bounded so one message never moves megabytes.
+    public static let maxPreviewSide = 1600, maxPreviewBytes = 3 * 1024 * 1024
     private static let extensions: Set<String> = ["png","jpg","jpeg","gif","webp","heic","tiff","tif"]
     /// Intentionally narrow: Markdown image/document links to images, or a complete image-path line.
     /// Code fences, indented code, inline code, prose paths and URLs do not request a file read.
@@ -66,6 +68,18 @@ public enum ChatImagePolicy {
     /// Reuse the existing document policy, with a smaller automatic-read surface.
     /// No hidden-root exception is enabled without a concrete product-owned media root.
     public static func thumbnail(_ path: String, home: String = NSHomeDirectory()) -> Data? {
+        guard let data=readAllowed(path,home:home) else { return nil }
+        return boundedThumbnail(data)
+    }
+
+    /// The same file rules as the thumbnail, at viewer size (longest side ≤ maxPreviewSide, PNG ≤ maxPreviewBytes).
+    public static func largePreview(_ path: String, home: String = NSHomeDirectory()) -> Data? {
+        guard let data=readAllowed(path,home:home), let source=boundedSource(data),
+              let image=AttachmentStore.thumbnail(source,max:maxPreviewSide), image.count <= maxPreviewBytes else { return nil }
+        return image
+    }
+
+    private static func readAllowed(_ path: String, home: String) -> Data? {
         let root=URL(fileURLWithPath:home).standardizedFileURL.resolvingSymlinksInPath().path
         let url=URL(fileURLWithPath:path).standardizedFileURL
         guard path == url.path, extensions.contains(url.pathExtension.lowercased()),
@@ -74,8 +88,7 @@ public enum ChatImagePolicy {
                   ArtifactPolicy.secretNames.contains(where: { matches(part.lowercased(),$0) })
               }), case .open = ArtifactPolicy.decide(path,home:home) else { return nil }
         // openat with O_NOFOLLOW on every component closes the validation/open symlink race.
-        guard let data=readRegularFile(path,maxBytes:maxBytes) else { return nil }
-        return boundedThumbnail(data)
+        return readRegularFile(path,maxBytes:maxBytes)
     }
 
     static func readRegularFile(_ path: String, maxBytes: Int) -> Data? {
@@ -104,14 +117,19 @@ public enum ChatImagePolicy {
     }
 
     public static func boundedThumbnail(_ data: Data) -> Data? {
+        guard let source=boundedSource(data), let thumbnail=AttachmentStore.thumbnail(source), thumbnail.count <= maxThumbnailBytes else { return nil }
+        return thumbnail
+    }
+
+    /// A decodable image within the byte, axis and pixel limits.
+    static func boundedSource(_ data: Data) -> CGImageSource? {
         guard !data.isEmpty, data.count <= maxBytes,
               let source=CGImageSourceCreateWithData(data as CFData,[kCGImageSourceShouldCache:false] as CFDictionary),
               CGImageSourceGetCount(source) > 0,
               let props=CGImageSourceCopyPropertiesAtIndex(source,0,nil) as? [CFString:Any],
               let width=props[kCGImagePropertyPixelWidth] as? Int, let height=props[kCGImagePropertyPixelHeight] as? Int,
-              width > 0, height > 0, width <= 16384, height <= 16384, width * height <= 40_000_000,
-              let thumbnail=AttachmentStore.thumbnail(source), thumbnail.count <= maxThumbnailBytes else { return nil }
-        return thumbnail
+              width > 0, height > 0, width <= 16384, height <= 16384, width * height <= 40_000_000 else { return nil }
+        return source
     }
 }
 

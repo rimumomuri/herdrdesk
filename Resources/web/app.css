@@ -889,7 +889,12 @@ main[data-page=conversations] #composer label:not(:focus-within) {
 
 .sidebar-section-title { padding:10px 8px 2px; font-size:11px; font-weight:560; color:var(--muted); overflow-wrap:anywhere }
 #roomList .hidden-conversation { opacity:.68 }
-#hiddenChatsToggle[aria-pressed=true] { border-color:#8c8c96 }
+/* Hidden chats: a quiet switch under the conversation list (not in Settings). */
+.hidden-chats-toggle { display:block; width:calc(100% - 8px); margin:6px 4px 2px; padding:6px 10px; border:1px dashed var(--line); border-radius:8px;
+  background:transparent; color:var(--muted); font-size:11.5px; text-align:left }
+.hidden-chats-toggle[hidden] { display:none }
+.hidden-chats-toggle:hover { color:var(--ink); border-color:#6a6a74 }
+#hiddenChatsToggle[aria-pressed=true] { border-style:solid; border-color:#8c8c96; color:var(--ink) }
 .chat-section-dialog {
   width:min(330px,calc(100vw - 24px)); padding:16px; border:1px solid #45454b; border-radius:13px;
   background:#242428; color:var(--ink);
@@ -1209,8 +1214,8 @@ html[data-inactive] .agent-portrait[data-working] * { animation-play-state:pause
 .hc-badge { margin-left:auto; flex:none; font-size:10.5px; padding:1px 8px; border-radius:999px; background:rgba(111,151,255,.14); color:#8fb0ff; white-space:nowrap }
 .hc-card[data-kind=reply] .hc-badge { background:rgba(67,201,143,.14); color:#5fd6a3 }
 .hc-card[data-kind=progress] .hc-badge,.hc-card[data-kind=message] .hc-badge,.hc-card[data-kind=pending] .hc-badge { background:#2b2b31; color:var(--muted) }
-.hc-body { font-size:12.5px; color:#d9d9e0; white-space:pre-wrap; overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; cursor:pointer }
-.hc-card[data-open] .hc-body { -webkit-line-clamp:unset; display:block }
+.hc-body { font-size:12.5px; color:#d9d9e0; white-space:normal; overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; cursor:pointer }
+.hc-card[data-open] .hc-body { -webkit-line-clamp:unset; display:block; white-space:pre-wrap; line-height:1.6 }   /* opened: one sentence per line */
 .presence-dot[data-presence=waiting] { background:#d9a646; box-shadow:0 0 4px #d9a64670 }
 
 /* Sidebar sections: collapsible, draggable headings and drop markers. */
@@ -1435,3 +1440,17 @@ details.settings[open] .settings-menu { animation:desk-pop 140ms var(--motion-ea
 #paletteList{list-style:none;margin:0;padding:6px;max-height:50vh;overflow:auto}#paletteList li{display:flex;align-items:baseline;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer}#paletteList li[aria-selected="true"]{background:#2b2b33}#paletteList b{font-weight:500}#paletteList small{color:var(--muted,#8a8e96);margin-left:auto;font-size:11px}
 .palette-kind{min-width:52px;color:var(--muted,#8a8e96);font-size:11px}#paletteEmpty{padding:14px 16px;margin:0}
 .question-recommend{margin:4px 0 6px;font-size:12px;color:var(--muted,#8a8e96)}.question-recommend b{color:#9fd5a3;font-weight:500}
+
+/* Image viewer: one shown image large, with ‹ › when the message has several. */
+.image-dialog { width:min(92vw,1200px); max-width:none; max-height:92vh; padding:0; border:1px solid var(--line); border-radius:14px; background:#17171b; color:var(--ink) }
+.image-dialog::backdrop { background:rgba(0,0,0,.72) }
+.image-dialog header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; border-bottom:1px solid var(--line) }
+.image-dialog h2 { margin:0; font-size:13px; font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.image-dialog header p { margin:2px 0 0; font-size:11px; color:var(--muted) }
+.image-stage { position:relative; display:grid; place-items:center; padding:12px; min-height:200px }
+.image-stage img { display:block; width:100%; height:min(calc(92vh - 90px),760px); object-fit:contain; border-radius:8px }   /* a small thumbnail fills the stage too */
+.image-nav { position:absolute; top:50%; transform:translateY(-50%); width:38px; height:38px; border-radius:50%; font-size:22px; line-height:1;
+  background:rgba(23,23,27,.78); color:#fff; border:1px solid #4a4a52 }
+.image-nav[hidden] { display:none }
+#imagePrev { left:14px } #imageNext { right:14px }
+.chat-image[data-index] img { cursor:zoom-in }

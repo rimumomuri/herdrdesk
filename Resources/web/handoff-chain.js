@@ -108,6 +108,24 @@ import { messageTag, tagHTML } from './message-tags.js';
 
 const CARD_BADGE = { assign: 'cardAssign', reply: 'cardReply', progress: 'cardProgress', message: 'cardMessage', pending: 'cardMessage' };
 
+/** A dense report as one sentence per line: break after 。．！？ and after . ! ? followed by a space. Dots inside
+ *  numbers, file names and links stay; code (fenced or indented) and indentation stay as written. No rewording. */
+export function readableBody(text) {
+  let fence = null;   // the opening marker; only the same character, at least as long, with nothing after it, closes it
+  return String(text ?? '').split('\n').map(line => {
+    const marker = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if (fence) {
+      if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && !marker[2].trim()) fence = null;
+      return line;
+    }
+    if (marker) { fence = marker[1]; return line; }
+    if (/^( {4}|\t)/.test(line)) return line;
+    // `inline code` stays whole: only the text between code spans is split.
+    return line.split(/(`[^`]*`)/).map((part, index) => index % 2 ? part
+      : part.replace(/([。．！？])[ \t]*(?=\S)/g, '$1\n').replace(/([.!?])[ \t]+(?=\S)/g, '$1\n')).join('');
+  }).join('\n');
+}
+
 /** One handoff card for the chat: sender → receiver, badge, time, first two lines of the body. */
 export function handoffCardHTML(card, nameOf, portraitOf, escape, copy, timeOf) {
   let body = String(card.body || '').trim();
@@ -118,7 +136,7 @@ export function handoffCardHTML(card, nameOf, portraitOf, escape, copy, timeOf) 
   return '<div class="hc-card" data-kind="' + escape(kind) + '" data-tag="' + escape(tag) + '" data-record-id="' + escape(card.id) + '">'
     + '<div class="hc-head">' + tagHTML(tag, copy, escape) + side(card.from) + '<span class="hc-arrow" aria-hidden="true"></span>' + side(card.to)
     + '<small class="msg-time">' + escape(timeOf(card.at)) + '</small></div>'
-    + '<div class="hc-body" data-lines="2">' + escape(body) + '</div></div>';
+    + '<div class="hc-body" data-lines="2">' + escape(readableBody(body)) + '</div></div>';
 }
 
 /** Handed work to someone and has not had it back yet (open, weak or unconfirmed outgoing edge). */

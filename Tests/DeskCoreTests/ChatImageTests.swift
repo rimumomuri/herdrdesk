@@ -90,6 +90,23 @@ final class ChatImageTests: XCTestCase {
         XCTAssertNil(restarted.load(ChatImageRecord(id:record.id,role:record.role,session:"new",body:record.body)))
         XCTAssertNil(restarted.load(ChatImageRecord(id:record.id,role:record.role,session:record.session,body:"different")))
     }
+    func testLargePreviewIsBiggerButKeepsThePathRules() throws {
+        let home=try makeRoot()
+        defer { try? FileManager.default.removeItem(at:home) }
+        try FileManager.default.createDirectory(at:home.appendingPathComponent("Pictures"),withIntermediateDirectories:true)
+        let image=home.appendingPathComponent("Pictures/wide.png");try makePNG(width:2400,height:1200).write(to:image)
+        let large=try XCTUnwrap(ChatImagePolicy.largePreview(image.path,home:home.path))
+        let source=try XCTUnwrap(CGImageSourceCreateWithData(large as CFData,nil))
+        let props=try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(source,0,nil) as? [CFString:Any])
+        XCTAssertEqual(props[kCGImagePropertyPixelWidth] as? Int, ChatImagePolicy.maxPreviewSide)
+        XCTAssertLessThanOrEqual(large.count, ChatImagePolicy.maxPreviewBytes)
+        let alias=home.appendingPathComponent("Pictures/link.png");try FileManager.default.createSymbolicLink(at:alias,withDestinationURL:image)
+        XCTAssertNil(ChatImagePolicy.largePreview(alias.path,home:home.path))
+        try makePNG().write(to:home.appendingPathComponent("outside.png"))
+        XCTAssertNil(ChatImagePolicy.largePreview(home.appendingPathComponent("outside.png").path,home:home.path))
+        try makePNG().write(to:home.appendingPathComponent("Pictures/token.png"))
+        XCTAssertNil(ChatImagePolicy.largePreview(home.appendingPathComponent("Pictures/token.png").path,home:home.path))
+    }
     func testDecodeAndPathBoundaries() throws {
         let png = try makePNG()
         let home=try makeRoot()

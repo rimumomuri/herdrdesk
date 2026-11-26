@@ -51,6 +51,61 @@ function renderChatText(text) {
   }).join('')+'</div>';
 }
 const imagePreviews=new ChatImagePreviews(post,()=>render());
+// Image viewer: clicking a shown image opens it large; several images in one message page with ‹ › or the arrow keys.
+// It shows the thumbnail at once and swaps in the viewer-size image when native sends it (agent files only).
+const largeImages=new Map();
+let viewer=null;
+function showViewerImage(){
+  if(!viewer)return;
+  const item=viewer.items[viewer.at], key=viewer.token+':'+item.index;
+  $('#imageTitle').textContent=item.name;
+  $('#imageCount').textContent=viewer.items.length>1?(viewer.at+1)+' / '+viewer.items.length:'';
+  $('#imageView').src=largeImages.get(key)||item.src;
+  $('#imageView').alt=item.name;
+  $('#imagePrev').hidden=$('#imageNext').hidden=viewer.items.length<2;
+  $('#imagePrev').setAttribute('aria-label',copy('imagePrev'));$('#imageNext').setAttribute('aria-label',copy('imageNext'));
+  if(!largeImages.has(key))imagePreviews.large(viewer.token,item.index);
+}
+function openImageViewer(figure){
+  const group=figure.closest('[data-chat-images]');
+  if(!group)return;
+  const items=[...group.querySelectorAll('figure.chat-image[data-index]')].filter(each=>each.querySelector('img'))
+    .map(each=>({index:Number(each.dataset.index),src:each.querySelector('img').src,name:each.querySelector('figcaption')?.textContent||''}));
+  const at=items.findIndex(item=>item.index===Number(figure.dataset.index));
+  if(at<0)return;
+  viewer={token:group.dataset.chatImages,items,at};
+  showViewerImage();
+  if(!$('#imageDialog').open)$('#imageDialog').showModal();
+}
+function stepViewer(delta){
+  if(!viewer||viewer.items.length<2)return;
+  viewer.at=(viewer.at+delta+viewer.items.length)%viewer.items.length;
+  showViewerImage();
+}
+function receiveLargeImage(payload){
+  if(typeof payload?.image!=='string'||!/^iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(payload.image))return;
+  largeImages.set(payload.token+':'+payload.index,'data:image/png;base64,'+payload.image);
+  while(largeImages.size>12)largeImages.delete(largeImages.keys().next().value);
+  if(viewer&&viewer.token===payload.token&&viewer.items[viewer.at]?.index===payload.index)showViewerImage();
+}
+document.addEventListener('click',event=>{
+  const figure=event.target.closest('figure.chat-image[data-index]');
+  if(figure&&figure.querySelector('img'))openImageViewer(figure);
+});
+document.addEventListener('keydown',event=>{
+  const figure=event.target.closest?.('figure.chat-image[data-index]');
+  if(figure&&(event.key==='Enter'||event.key===' ')){event.preventDefault();openImageViewer(figure);}
+});
+$('#imageDialog').addEventListener('click',event=>{
+  const nav=event.target.closest('[data-nav]');
+  if(nav)stepViewer(Number(nav.dataset.nav));
+  else if(event.target.id==='imageClose'||event.target===event.currentTarget)$('#imageDialog').close();
+});
+$('#imageDialog').addEventListener('keydown',event=>{
+  if(event.key==='ArrowLeft'){event.preventDefault();stepViewer(-1);}
+  if(event.key==='ArrowRight'){event.preventDefault();stepViewer(1);}
+});
+$('#imageDialog').addEventListener('close',()=>{viewer=null;$('#imageView').removeAttribute('src');});
 const imageObserver=new IntersectionObserver(entries=>{
   for(const entry of entries)if(entry.isIntersecting){imagePreviews.request(entry.target.dataset.chatPreview);imageObserver.unobserve(entry.target);}
 });
@@ -58,8 +113,16 @@ function observeChatImages(){
   imageObserver.disconnect();
   for(const element of document.querySelectorAll('[data-chat-preview]'))imageObserver.observe(element);
 }
+// Images just sent (previews kept in this page) get a viewer group of their own, stable per message so screens that
+// compare HTML do not redraw; there is no file behind them, so the viewer shows the thumbnail.
+const sentViewerTokens=new Map();
+function sentViewerToken(entry){
+  const key=String(entry.id||'');
+  if(!sentViewerTokens.has(key))sentViewerTokens.set(key,'image'+(800000000+sentViewerTokens.size));
+  return sentViewerTokens.get(key);
+}
 function messageImages(entry){
-  if(Array.isArray(entry.previews))return chatImageMarkup(entry.previews);
+  if(Array.isArray(entry.previews))return chatImageMarkup(entry.previews,sentViewerToken(entry));
   const previewRole=entry.role?.startsWith('session:')?entry.address:(entry.role||entry.address);
   const record=(entry.images>0&&previewRole&&entry.session)?{id:entry.id,role:previewRole,session:entry.session,body:entry.imageBody??entry.text??entry.body??'',sentImages:true}:conversationRecords().find(record=>record.id===entry.id&&record.body===(entry.body??entry.text));
   return imagePreviews.markup(record);
@@ -691,7 +754,7 @@ function renderRooms(){
   if(!hidden.length)showHiddenChats=false;
   const hiddenToggle=$('#hiddenChatsToggle');
   hiddenToggle.hidden=!hidden.length;
-  hiddenToggle.textContent=copy('hiddenChats')+(hidden.length?' '+hidden.length:'');
+  hiddenToggle.textContent=copy(showHiddenChats?'hiddenChatsHide':'hiddenChatsShow').replace('{n}',String(hidden.length));
   hiddenToggle.setAttribute('aria-pressed',String(showHiddenChats));
   const shelf=$('#pinnedChats'), focus=document.activeElement?.dataset;
   shelf.hidden=pinned.length===0;
@@ -2761,6 +2824,7 @@ window.desk={
     playActivity();
   },
   chatImages(payload){imagePreviews.receive(payload);},
+  chatImageLarge(payload){receiveLargeImage(payload);},
   sendResult(id,state,previews=[]){
     const item=deliveries.find(entry=>entry.id===id);
     if(!item||item.state!=='sending')return;
