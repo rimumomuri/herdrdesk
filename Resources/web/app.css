@@ -1038,7 +1038,7 @@ main[data-page=conversations] #groupMembers .roster-head { border:0 }
 .hr-branch { padding-left:28px; opacity:.92; overflow:visible }
 .hr-fork { width:14px; height:18px; margin-right:2px; border-left:2px solid var(--hr-weak); border-bottom:2px solid var(--hr-weak); border-bottom-left-radius:8px; align-self:flex-start }
 .hr-node { position:relative; display:flex; flex-direction:column; align-items:center; gap:1px; min-width:58px; max-width:108px; flex:none }
-.hr-face { position:relative; display:grid; place-items:center; width:38px; height:38px }
+.hr-face { position:relative; isolation:isolate; display:grid; place-items:center; width:38px; height:38px }
 .hr-face>.agent-portrait,.hr-face>svg:not(.hr-tool),.hr-face>.avatar { width:36px; height:36px }
 .hr-name { font-size:11px; font-weight:650; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .hr-state { display:flex; align-items:center; gap:4px; font-size:10px; color:var(--muted); white-space:nowrap }
@@ -1083,7 +1083,33 @@ main[data-page=conversations] #groupMembers .roster-head { border:0 }
 @keyframes hr-flow { to { stroke-dashoffset:-18 } } @keyframes hr-flowback { to { stroke-dashoffset:18 } }
 @keyframes hr-send { from { left:0; opacity:0 } 15%,85% { opacity:1 } to { left:calc(100% - 14px); opacity:0 } }
 @keyframes hr-return { from { left:calc(100% - 14px); opacity:0 } 15%,85% { opacity:1 } to { left:0; opacity:0 } }
-@media (prefers-reduced-motion: reduce) { .handoff-rail * { animation:none!important } }
+/* Feeding: the node an arrow points at is working, so light runs down the arrow and is absorbed into its face. */
+.hr-link { --hr-c:var(--hr-weak) } .hr-link[data-kind=go] { --hr-c:var(--hr-go) } .hr-link[data-kind=hold] { --hr-c:var(--hr-hold) }
+.hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working])) path { stroke:var(--hr-c); stroke-dasharray:none; opacity:.9 }
+.hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working])) svg { filter:drop-shadow(0 0 2px var(--hr-c)) drop-shadow(0 0 5px var(--hr-c)) }
+.hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working])) .hr-head { filter:drop-shadow(0 0 3px var(--hr-c)) }
+.hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working]))::after { content:""; position:absolute; top:4px; left:-22px; width:22px; height:6px; border-radius:3px; opacity:0; pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--hr-c) 50%,#fff 85%); box-shadow:0 0 8px 2px var(--hr-c),0 0 16px 3px var(--hr-c); transform-origin:100% 50% }
+.hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working])) .hr-packet { display:none }
+.hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working])) + .hr-node { --hr-c:var(--hr-weak) }
+.hr-link[data-kind=go]:has(+ .hr-node:is([data-state=working],[data-activity=working])) + .hr-node { --hr-c:var(--hr-go) }
+.hr-link[data-kind=hold]:has(+ .hr-node:is([data-state=working],[data-activity=working])) + .hr-node { --hr-c:var(--hr-hold) }
+.hr-link:not([data-kind=back]) + .hr-node:is([data-state=working],[data-activity=working]) .hr-face::before { content:""; position:absolute; inset:2px; border-radius:50%; z-index:-1; pointer-events:none;
+  background:radial-gradient(circle,var(--hr-c) 0%,transparent 70%); opacity:.35 }
+.hr-link:not([data-kind=back]) + .hr-node:is([data-state=working],[data-activity=working]) .hr-face::after { content:""; position:absolute; inset:1px; border-radius:50%; pointer-events:none;
+  box-shadow:0 0 0 2px var(--hr-c),0 0 10px 2px var(--hr-c); opacity:0 }
+.hr-node[data-activity=working] { opacity:1 }   /* its terminal is running: not faded even before the handoff is confirmed */
+.handoff-rail[data-motion=on] .hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working])) path { animation:none }
+.handoff-rail[data-motion=on] .hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working]))::after { animation:hr-feed 1.4s ease-in infinite }
+.handoff-rail[data-motion=on] .hr-link:not([data-kind=back]):has(+ .hr-node:is([data-state=working],[data-activity=working])) .hr-head { animation:hr-head-glow 1.4s linear infinite }
+.handoff-rail[data-motion=on] .hr-link:not([data-kind=back]) + .hr-node:is([data-state=working],[data-activity=working]) .hr-face::before { animation:hr-absorb-glow 1.4s ease-out infinite }
+.handoff-rail[data-motion=on] .hr-link:not([data-kind=back]) + .hr-node:is([data-state=working],[data-activity=working]) .hr-face::after { animation:hr-absorb-ring 1.4s ease-out infinite }
+@keyframes hr-feed { 0% { left:-22px; opacity:0; transform:scaleX(.5) } 12% { opacity:1 } 68% { left:calc(100% - 22px); opacity:1; transform:scaleX(1) }
+  84% { left:calc(100% + 4px); opacity:0; transform:scaleX(.15) } 100% { left:calc(100% + 4px); opacity:0; transform:scaleX(.15) } }
+@keyframes hr-head-glow { 0%,58%,100% { filter:drop-shadow(0 0 3px var(--hr-c)) } 72% { filter:drop-shadow(0 0 7px var(--hr-c)) brightness(1.7) } }
+@keyframes hr-absorb-glow { 0%,70%,100% { opacity:.3 } 84% { opacity:1 } }
+@keyframes hr-absorb-ring { 0%,72% { opacity:0; transform:scale(.75) } 82% { opacity:.95; transform:scale(.95) } 100% { opacity:0; transform:scale(1.25) } }
+@media (prefers-reduced-motion: reduce) { .handoff-rail *,.handoff-rail *::before,.handoff-rail *::after { animation:none!important } }
 /* Working portraits everywhere else (chat list, header, participants): same bob and hammer as the rail. */
 .agent-portrait[data-working] { position:relative; overflow:visible }
 .agent-portrait[data-working]>.hr-tool { position:absolute; right:-16%; top:-16%; width:50%; height:50%; display:block }
