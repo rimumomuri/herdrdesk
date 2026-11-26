@@ -1065,6 +1065,10 @@ main[data-page=conversations] #groupMembers .roster-head { border:0 }
 .hr-link[data-kind=go] .hr-packet { display:block; background:var(--hr-go) }
 .hr-link[data-kind=back] .hr-packet { display:block; background:var(--hr-back) }
 .hr-more { flex:none; align-self:flex-start; margin:8px 2px 0; padding:2px 8px; font-size:11px; border-radius:999px; color:var(--muted) }
+.hr-flow { display:grid; gap:4px; min-width:0 } .hr-flow+.hr-flow { padding-top:6px; border-top:1px dashed var(--line) }
+.hr-title { margin:0; font-size:10.5px; font-weight:650; color:var(--muted); padding:0 2px }
+.hr-more-flows { justify-self:start; margin:0 }
+.hr-node[data-state=working] .hr-name { color:var(--hr-go) }
 .hr-note { font-size:11.5px; padding:0 2px; display:flex; flex-wrap:wrap; gap:2px 8px; align-items:baseline }
 .hr-note small { color:var(--muted); font-size:10.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100% }
 .handoff-rail[data-motion=on] .hr-node[data-state=working] .hr-face { animation:hr-bob .55s ease-in-out infinite alternate }

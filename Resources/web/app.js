@@ -9,6 +9,7 @@ import { roleLook } from './role-look.js';
 import { t, languageFrom } from './locale.js';
 import { shortRoleTitle, nextKey, chatHidden, foldLeadChats, inRoomConversation, groupRows, moveChat, moveSection, toggleSection, addSection, renameSection, deleteSection } from './chat-sections.js';
 import { buildChain, handoffCardsFor, handoffCardHTML, isDelegating } from './handoff-chain.js';
+import { teamFlows, markWaiting } from './team-flow.js';
 import { messageTag, awaitingResponse, tagHTML } from './message-tags.js';
 import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick } from './sound-rules.js';
 import { sheep } from './sheep.js';
@@ -1324,6 +1325,9 @@ function railName(node){
 }
 // A branch starts under the node it forks from, not under the first node of the chain.
 function alignRailBranches(rail){
+  for(const flow of rail.querySelectorAll('.hr-flow'))alignFlowBranches(flow);
+}
+function alignFlowBranches(rail){
   const main=rail.querySelector('.hr-row:not(.hr-branch)');
   if(!main)return;
   const nodes=main.querySelectorAll('.hr-node'), left=main.getBoundingClientRect().left;
@@ -1338,11 +1342,13 @@ function alignRailBranches(rail){
 const cleanSummary=text=>String(text||'').replace(/\[HerdrDesk[^\]]*\]/g,'').replace(/<\/?hc[^>]*>/g,'').replace(/\s+/g,' ').trim();
 function railNode(node){
   const term=inventory.find(item=>item.address===node.address&&(!node.session||item.session===node.session));
-  const working=node.state==='working';
+  // One label: working now (handoff or terminal), waiting on someone named, or the handoff state.
+  const working=node.state==='working'||node.sessionActivity==='working';
+  const state=working?'working':node.state;
   const face=node.address==='desk'?avatar(copy('you')):(term&&agentPortrait(term,working))||portraitArtwork('neutral',false);
-  return '<div class="hr-node" data-state="'+escape(node.state)+'"'+(node.address==='desk'?' data-desk':'')+'><span class="hr-face">'+face+(working?RAIL_HAMMER:'')+'</span>'
-    +'<b class="hr-name">'+escape(railName(node))+'</b><small class="hr-state">'+(RAIL_ICONS[node.state]||'')
-    +escape(copy('chainState_'+node.state))+'</small></div>';
+  const label=working?copy('flowWorking'):state==='waiting'&&node.waitingFor?copy('flowWaitingFor').replace('{name}',()=>railName({address:node.waitingFor,role:''})):copy('chainState_'+state);
+  return '<div class="hr-node" data-state="'+escape(state)+'"'+(node.address==='desk'?' data-desk':'')+(node.sessionActivity?' data-activity="'+escape(node.sessionActivity)+'"':'')+'><span class="hr-face">'+face+(working?RAIL_HAMMER:'')+'</span>'
+    +'<b class="hr-name">'+escape(railName(node))+'</b><small class="hr-state">'+(RAIL_ICONS[state]||'')+escape(label)+'</small></div>';
 }
 const railLink=link=>'<span class="hr-link" data-kind="'+escape(link.kind)+'" aria-hidden="true"><svg viewBox="0 0 100 12" preserveAspectRatio="none"><path d="M0 6H100"/></svg><i class="hr-head"></i><i class="hr-packet"></i></span>';
 function railRow(nodes,links,hidden=0,hiddenAt=-1,key=''){
@@ -1370,25 +1376,42 @@ function entryMeta(entry,entries,index){
   }
   return tagHTML(tag,copy,escape)+escape(entry.from)+' · '+(entry.at?time(entry.at):'—')+(tag?'':' · '+copy(entry.state));
 }
+function railChainHTML(chain,key){
+  return '<div class="hr-flow"><div class="hr-row">'+railRow(chain.nodes,chain.links,chain.hidden,chain.hiddenAt,key)+'</div>'
+    +chain.branches.map(branch=>'<div class="hr-row hr-branch" data-at="'+branch.at+'"><span class="hr-fork" aria-hidden="true"></span>'+railLink(branch.links[0])+railRow(branch.nodes,branch.links.slice(1))+'</div>').join('')+'</div>';
+}
+// A team room shows every flow running in the team; a direct conversation shows that agent's own chain.
 function renderHandoffRail(term,room){
   const rail=$('#handoffRail');
   clearTimeout(handoffRailTimer);
-  const start=room?(room.members.find(member=>member.command&&!member.command.paused)||roomLead(room)):term;
-  if(page!=='conversations'||snapshot.connection!=='live'||!start){rail.hidden=true;return false;}
+  if(page!=='conversations'||snapshot.connection!=='live'||(!room&&!term)){rail.hidden=true;return false;}
   const key=room?'room:'+room.id:sessionKey(term);
-  const chain=buildChain(snapshot.handoffs,{address:start.address,session:start.session,role:legacyDraftKey(start)},railStatus,Date.now(),{collapse:!expandedChains.has(key)});
-  if(!chain){rail.hidden=true;setPanel('#handoffRail','');return false;}
-  const name=role=>railName(chain.nodes.find(node=>node.role===role)||{role,address:''});
-  const latest=(snapshot.handoffs?.edges||[]).filter(edge=>chain.nodes.some(node=>node.address===edge.to.address)).sort((a,b)=>b.updatedAt-a.updatedAt)[0];
-  const html='<div class="hr-row">'+railRow(chain.nodes,chain.links,chain.hidden,chain.hiddenAt,key)+'</div>'
-    +chain.branches.map(branch=>'<div class="hr-row hr-branch" data-at="'+branch.at+'"><span class="hr-fork" aria-hidden="true"></span>'+railLink(branch.links[0])+railRow(branch.nodes,branch.links.slice(1))+'</div>').join('')
-    +'<p class="hr-note" role="status">'+escape(copy(chain.note.key).replace('{name}',()=>name(chain.note.name)))
+  const expanded=expandedChains.has(key);
+  let chains=[], hidden=0;
+  if(room){
+    const members=room.members.map(member=>({address:member.address,session:member.session,role:legacyDraftKey(member)}));
+    ({flows:chains,hidden}=teamFlows(snapshot.handoffs,members,railStatus,Date.now(),{limit:expanded?20:3,collapse:!expanded}));
+  }else{
+    const chain=buildChain(snapshot.handoffs,{address:term.address,session:term.session,role:legacyDraftKey(term)},railStatus,Date.now(),{collapse:!expanded});
+    if(chain)chains=[markWaiting(chain,snapshot.handoffs?.edges||[])];
+  }
+  if(!chains.length){rail.hidden=true;setPanel('#handoffRail','');return false;}
+  const nodes=chains.flatMap(chain=>[...chain.nodes,...chain.branches.flatMap(branch=>branch.nodes)]);
+  const name=role=>railName(nodes.find(node=>node.role===role)||{role,address:''});
+  const working=[...new Set(nodes.filter(node=>node.address!=='desk'&&(node.state==='working'||node.sessionActivity==='working')).map(node=>railName(node)))];
+  const latest=(snapshot.handoffs?.edges||[]).filter(edge=>nodes.some(node=>node.address===edge.to.address)).sort((a,b)=>b.updatedAt-a.updatedAt)[0];
+  const first=chains[0];
+  const note=working.length?copy('flowNow').replace('{names}',()=>working.join(', ')):copy(first.note.key).replace('{name}',()=>name(first.note.name));
+  const html=(room&&chains.length+hidden>1?'<p class="hr-title">'+escape(copy('flowCount').replace('{n}',String(chains.length+hidden)))+'</p>':'')
+    +chains.map(chain=>railChainHTML(chain,key)).join('')
+    +(hidden?'<button type="button" class="hr-more hr-more-flows" data-chain-expand="'+escape(key)+'">'+escape(copy('flowMore').replace('{n}',String(hidden)))+'</button>':'')
+    +'<p class="hr-note" role="status">'+escape(note)
     +(latest?.summary?'<small title="'+escape(latest.summary)+'">'+escape(snippet(cleanSummary(latest.summary),70))+'</small>':'')+'</p>';
   setPanel('#handoffRail',html);
   alignRailBranches(rail);
   rail.dataset.motion=motionPreference.matches?'off':'on';
   rail.hidden=false;
-  if(chain.links.some(link=>link.kind==='go'))handoffRailTimer=setTimeout(()=>renderHandoffRail(active(),currentRoom()),3200);
+  if(chains.some(chain=>chain.links.some(link=>link.kind==='go')))handoffRailTimer=setTimeout(()=>renderHandoffRail(active(),currentRoom()),3200);
   return true;
 }
 document.addEventListener('click',event=>{

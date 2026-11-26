@@ -86,7 +86,7 @@ const strings = {
  chainDelegating:['{name} is handing work over','{name}이(가) 일을 맡기는 중','{name}が仕事を渡しています'],
  chainReturning:['{name} is bringing the result back','{name}이(가) 결과를 돌려주는 중','{name}が結果を返しています'],
  chainWaitingAll:['Waiting for the result','결과를 기다리는 중','結果を待っています'],
- chainState_working:['Working','작업 중','作業中'],chainState_waiting:['Waiting','기다리는 중','待機中'],
+ chainState_working:['Working','작업 중','作業中'],flowWorking:['Working now','처리 중','処理中'],flowWaitingFor:['Waiting on {name}','{name} 기다림','{name}待ち'],flowCount:['{n} flows in this team','팀 흐름 {n}개','このチームの流れ {n}件'],flowMore:['Show {n} more flows','흐름 {n}개 더 보기','流れをあと{n}件表示'],flowNow:['Working now: {names}','지금 처리 중: {names}','処理中: {names}'],chainState_waiting:['Waiting','기다리는 중','待機中'],
  chainState_done:['Done','마침','完了'],chainState_idle:['Idle','대기','待機'],chainState_unconfirmed:['Checking','확인 중','確認中'],
  chainHidden:['…+{n}','…+{n}','…+{n}'],
  cardAssign:['Handed over','일 전달','引き継ぎ'],cardReply:['Result back','결과 회신','結果の返信'],cardProgress:['Update','중간 보고','途中報告'],cardMessage:['Message','메시지','メッセージ'],

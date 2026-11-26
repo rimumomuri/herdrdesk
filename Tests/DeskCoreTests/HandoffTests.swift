@@ -38,6 +38,108 @@ final class HandoffTests: XCTestCase {
         XCTAssertEqual(book.cards.last?.kind, "assign")
     }
 
+    func testInstructionRightAfterResultReopensWhenReceiverWorksAgain() {
+        let book = HandoffBook()
+        book.record(msg(lead, prod, t0))
+        book.observe(signals(["t2":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t2":"idle"]), now: t0 + 60_000)
+        book.record(msg(lead, prod, t0 + 61_000, "keep going on the same card"))
+        XCTAssertEqual(book.edges[0].state, "closed")
+        var working = signals(["t2":"working"]); working.statusSince = ["t2": t0 + 63_000]
+        book.observe(working, now: t0 + 64_000)
+        XCTAssertEqual(book.edges.count, 1)
+        XCTAssertEqual(book.edges[0].state, "open")
+        XCTAssertNil(book.edges[0].closedAt)
+        XCTAssertNil(book.edges[0].returnedAt)
+        XCTAssertEqual(book.edges[0].summary, "keep going on the same card")
+    }
+
+    func testReopenedFollowUpIsNotClosedByThePreviousResultLabel() {
+        let book = HandoffBook()
+        book.record(msg(lead, prod, t0))
+        var done = signals(["t2":"idle"])
+        done.flows = [HandoffFlow(worker:prod, lead:lead, id:"f1", phase:"result-sent", updatedAt:t0 + 30_000)]
+        book.observe(done, now: t0 + 31_000)
+        XCTAssertEqual(book.edges[0].state, "closed")
+        book.record(msg(lead, prod, t0 + 60_000, "keep going"))
+        var again = signals(["t2":"working"]); again.statusSince = ["t2": t0 + 61_000]
+        again.flows = done.flows
+        book.observe(again, now: t0 + 62_000)
+        XCTAssertEqual(book.edges[0].state, "open")
+        book.observe(again, now: t0 + 63_000)
+        XCTAssertEqual(book.edges[0].state, "open")
+        var next = again; next.flows = [HandoffFlow(worker:prod, lead:lead, id:"f1", phase:"result-sent", updatedAt:t0 + 90_000)]
+        book.observe(next, now: t0 + 91_000)
+        XCTAssertEqual(book.edges[0].state, "closed")   // a new result for the follow-up still closes it
+    }
+
+    func testResultOfAReopenedFollowUpIsTheAnswerNotANewHandoff() {
+        let book = HandoffBook()
+        book.record(msg(lead, prod, t0))
+        book.observe(signals(["t2":"working"]), now: t0 + 1_000)
+        book.record(msg(prod, lead, t0 + 30_000, "first result"))
+        book.observe(signals(["t2":"idle"]), now: t0 + 31_000)
+        XCTAssertNotNil(book.edges[0].answeredAt)
+        book.record(msg(lead, prod, t0 + 60_000, "keep going"))
+        var again = signals(["t2":"working"]); again.statusSince = ["t2": t0 + 61_000]
+        book.observe(again, now: t0 + 62_000)
+        XCTAssertEqual(book.edges[0].state, "open")
+        book.observe(signals(["t2":"idle"]), now: t0 + 90_000)
+        book.record(msg(prod, lead, t0 + 89_000, "second result"))
+        XCTAssertEqual(book.edges.count, 1)
+        XCTAssertEqual(book.cards.last?.kind, "reply")
+    }
+
+    func testReloadedReopenedHandoffDoesNotTakeBackTheEarlierAnswer() {
+        let book = HandoffBook()
+        book.record(msg(lead, prod, t0))
+        book.observe(signals(["t2":"working"]), now: t0 + 1_000)
+        book.record(msg(prod, lead, t0 + 30_000, "first result"))
+        book.observe(signals(["t2":"idle"]), now: t0 + 31_000)
+        book.record(msg(lead, prod, t0 + 60_000, "keep going"))
+        var again = signals(["t2":"working"]); again.statusSince = ["t2": t0 + 61_000]
+        book.observe(again, now: t0 + 62_000)
+        let reloaded = HandoffBook(edges: book.edges, cards: book.cards)
+        XCTAssertNil(reloaded.edges[0].answeredAt)
+    }
+
+    func testNewAssignmentStopsAnOlderAcknowledgementFromReopening() {
+        let book = HandoffBook()
+        book.record(msg(lead, prod, t0))
+        book.observe(signals(["t2":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t2":"idle"]), now: t0 + 60_000)
+        book.record(msg(lead, prod, t0 + 61_000, "thanks"))
+        book.record(msg(lead, prod, t0 + 300_000, "a separate task"))
+        XCTAssertEqual(book.edges.count, 2)
+        var working = signals(["t2":"working"]); working.statusSince = ["t2": t0 + 301_000]
+        book.observe(working, now: t0 + 302_000)
+        XCTAssertEqual(book.edges[0].state, "closed")
+        XCTAssertEqual(book.edges[1].state, "open")
+    }
+
+    func testAcknowledgementDoesNotReopenWhenReceiverStaysIdle() {
+        let book = HandoffBook()
+        book.record(msg(lead, prod, t0))
+        book.observe(signals(["t2":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t2":"idle"]), now: t0 + 60_000)
+        book.record(msg(lead, prod, t0 + 61_000, "thanks"))
+        book.observe(signals(["t2":"idle"]), now: t0 + 61_000 + HandoffBook.weakAfter + 1)
+        var working = signals(["t2":"working"]); working.statusSince = ["t2": t0 + 61_000 + HandoffBook.weakAfter + 2]
+        book.observe(working, now: t0 + 61_000 + HandoffBook.weakAfter + 3)
+        XCTAssertEqual(book.edges[0].state, "closed")   // too late: that work is not about the acknowledgement
+    }
+
+    func testWorkThatStartedBeforeTheFollowUpDoesNotReopen() {
+        let book = HandoffBook()
+        book.record(msg(lead, prod, t0))
+        book.observe(signals(["t2":"working"]), now: t0 + 1_000)
+        book.observe(signals(["t2":"idle"]), now: t0 + 60_000)
+        book.record(msg(lead, prod, t0 + 61_000, "thanks"))
+        var working = signals(["t2":"working"]); working.statusSince = ["t2": t0 + 60_500]
+        book.observe(working, now: t0 + 62_000)
+        XCTAssertEqual(book.edges[0].state, "closed")
+    }
+
     func testUserQuestionRightAfterAnAnswerOpensANewHandoff() {
         let book = HandoffBook()
         book.record(msg(.desk, lead, t0, source:"desk"))

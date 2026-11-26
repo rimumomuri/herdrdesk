@@ -79,6 +79,10 @@ public struct HandoffEdge: Codable {
     public var lineageId: String?
     /// When the receiver answered it (a reply card). Kept on the edge: cards are capped and pruned.
     public var answeredAt: Double? = nil
+    /// A message from the sender right after this closed. If the receiver starts working on it, the handoff reopens.
+    public var followUpAt: Double? = nil
+    /// When a follow-up reopened it: flow and lineage labels from before then belong to the earlier work.
+    public var reopenedAt: Double? = nil
     var isOpen: Bool { ["open", "weak", "unconfirmed"].contains(state) }
 }
 
@@ -106,7 +110,7 @@ public final class HandoffBook {
         // Books saved before `answeredAt` existed: a reply card from the receiver means it was answered.
         for i in self.edges.indices where self.edges[i].answeredAt == nil {
             let e = self.edges[i]
-            if let reply = cards.last(where: { $0.id.hasPrefix("c:\(e.id):") && $0.kind == "reply" && $0.from.same(e.to) }) { self.edges[i].answeredAt = reply.at }
+            if let reply = cards.last(where: { $0.id.hasPrefix("c:\(e.id):") && $0.kind == "reply" && $0.from.same(e.to) && $0.at > (e.reopenedAt ?? -.infinity) }) { self.edges[i].answeredAt = reply.at }
         }
     }
 
@@ -135,6 +139,8 @@ public final class HandoffBook {
         if m.from != .desk, let i = edges.lastIndex(where: { !$0.isOpen && $0.from.same(m.from) && $0.to.same(m.to) }),
            let ended = edges[i].closedAt, m.at >= ended - Self.mergeWindow, m.at - ended <= Self.mergeWindow {
             _ = addCard(edges[i], at: m.at, kind: "message", from: m.from, to: m.to, body: body)
+            edges[i].followUpAt = m.at
+            edges[i].summary = body
             return
         }
         // The first answer to something the other side handed over (and that really finished) joins it:
@@ -147,6 +153,8 @@ public final class HandoffBook {
             _ = addCard(edges[i], at: m.at, kind: "reply", from: m.from, to: m.to, body: body)
             return
         }
+        // A new handoff between the same two supersedes an older "keep going?" candidate.
+        for j in edges.indices where edges[j].followUpAt != nil && edges[j].from.same(m.from) && edges[j].to.same(m.to) { edges[j].followUpAt = nil }
         let edge = HandoffEdge(id: "h:\(m.from.address):\(m.to.address):\(Int(m.at))", from: m.from, to: m.to,
                                openedAt: m.at, updatedAt: m.at, closedAt: nil, state: "open", signal: "transcript",
                                summary: body, workedSinceOpen: false, pendingReplyAt: nil, pendingCardId: nil,
@@ -156,6 +164,17 @@ public final class HandoffBook {
     }
 
     public func observe(_ s: HandoffSignals, now: Double) {
+        // "Keep going" sent right after a result is a new instruction once the receiver starts on it; a thanks is not.
+        for i in edges.indices where edges[i].state == "closed" {
+            guard let follow = edges[i].followUpAt else { continue }
+            let to = edges[i].to.address
+            if now - follow > Self.weakAfter { edges[i].followUpAt = nil; continue }
+            guard s.status[to] == "working", s.statusSince[to].map({ $0 >= follow }) ?? true,
+                  edges[i].to.session.isEmpty || s.session[to] == nil || s.session[to] == edges[i].to.session else { continue }
+            edges[i].state = "open"; edges[i].closedAt = nil; edges[i].returnedAt = nil
+            edges[i].workedSinceOpen = true; edges[i].updatedAt = follow; edges[i].followUpAt = nil; edges[i].reopenedAt = follow
+            edges[i].answeredAt = nil; edges[i].pendingReplyAt = nil; edges[i].pendingCardId = nil; edges[i].busyAfterReply = nil   // the follow-up waits for its own answer
+        }
         for i in edges.indices where edges[i].isOpen {
             var e = edges[i]
             defer { edges[i] = e }
@@ -167,7 +186,12 @@ public final class HandoffBook {
                 if e.state != "open" { e.state = "open" }
             }
             // herdr-flow is the strongest signal, but only a flow written for this handoff (not an old label).
-            let fresh: (Double?) -> Bool = { at in at.map { $0 >= e.openedAt - Self.mergeWindow } ?? false }
+            let since = e.reopenedAt, opened = e.openedAt
+            let fresh: (Double?) -> Bool = { at in
+                guard let at else { return false }
+                if let since { return at > since }
+                return at >= opened - Self.mergeWindow
+            }
             if let flow = s.flows.last(where: { $0.worker.same(e.to) && $0.lead.same(e.from) && fresh($0.updatedAt) }) {
                 e.signal = "flow"; e.flowId = flow.id
                 switch flow.phase {
