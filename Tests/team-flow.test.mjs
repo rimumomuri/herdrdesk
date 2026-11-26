@@ -68,3 +68,9 @@ test('folding a long chain does not change who a node waits for', () => {
   assert.equal(flows[0].nodes[1].address, 't11');
   assert.equal(flows[0].nodes[1].waitingFor, 't12');
 });
+
+test('a coordinator outside the team does not pull in another team’s people', () => {
+  const hq = p('t20', 'hq'), other = p('t21', 'other-lead');
+  const { flows } = teamFlows({ edges: [edge(hq, lead), edge(hq, other)] }, team, status({ t1: 'working', t21: 'working' }), now);
+  assert.deepEqual(flows.map(addresses), [['t20', 't1']]);
+});

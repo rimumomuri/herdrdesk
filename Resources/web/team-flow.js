@@ -31,7 +31,9 @@ function trimCovered(chain, covered) {
 
 export function teamFlows(handoffs, members, statusOf, now, { limit = 3, collapse = true } = {}) {
   const inTeam = party => members.some(member => flowSame(member, party));
-  const edges = (handoffs?.edges || []).filter(edge => FLOW_LIVE.has(edge.state) && (inTeam(edge.from) || inTeam(edge.to)));
+  // Chains are built only from this team's edges, so a coordinator's handoffs to other teams stay out.
+  const scoped = { ...handoffs, edges: (handoffs?.edges || []).filter(edge => inTeam(edge.from) || inTeam(edge.to)) };
+  const edges = scoped.edges.filter(edge => FLOW_LIVE.has(edge.state));
   const parties = [];
   const add = party => { if (party && party.address !== 'desk' && !parties.some(seen => flowSame(seen, party))) parties.push(party); };
   edges.forEach(edge => { add(edge.from); add(edge.to); });
@@ -45,14 +47,14 @@ export function teamFlows(handoffs, members, statusOf, now, { limit = 3, collaps
   const flows = [], covered = [];
   const take = party => {
     if (covered.some(seen => flowSame(seen, party))) return;
-    const full = buildChain(handoffs, named(party), statusOf, now, { collapse: false });
+    const full = buildChain(scoped, named(party), statusOf, now, { collapse: false });
     if (!full) return;
     const everyone = chain => [...chain.nodes, ...chain.branches.flatMap(branch => branch.nodes)];
     const overlaps = everyone(full).some((node, index) => index > 0 && node.address !== 'desk' && covered.some(seen => flowSame(seen, node)));
-    const chain = overlaps ? trimCovered(full, covered) : collapse ? buildChain(handoffs, named(party), statusOf, now, { collapse }) : full;
+    const chain = overlaps ? trimCovered(full, covered) : collapse ? buildChain(scoped, named(party), statusOf, now, { collapse }) : full;
     // Coverage counts everyone in the flow, also those the folded display leaves out.
     covered.push(...everyone(overlaps ? chain : full));
-    flows.push(markWaiting(chain, handoffs?.edges || []));
+    flows.push(markWaiting(chain, scoped.edges));
   };
   parties.filter(party => !handedByTeam(party)).sort(rank).forEach(take);
   parties.sort(rank).forEach(take);   // what no root reached: a cycle, or a chain cut short
