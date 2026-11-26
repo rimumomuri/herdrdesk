@@ -1588,6 +1588,9 @@ function detail() {
     badge.className='chat-kind'; badge.dataset.kind=chatKind; badge.textContent=copy(chatKind==='team'?'chatKindTeam':'chatKindDirect');
     $('#targetTitle').append(' ',badge);
   }
+  // Above the composer: who the message goes to (the team's lead, or this agent directly).
+  $('#composerTarget').textContent=chatKind==='team'?copy('composerToTeam').replace('{team}',()=>room.title)
+    :chatKind==='direct'?copy('composerToDirect').replace('{name}',()=>term.label||term.address):'';
   $('#targetPath').textContent=room?(term?copy('leadTo')+' · '+term.label:copy('leadUnavailable'))
     :term?[agentLabel(term),machineFor(term)].filter(Boolean).join(' · '):'';
   $('#send').textContent=copy(room?'sendToLead':page==='conversations'?'directSend':'send');
