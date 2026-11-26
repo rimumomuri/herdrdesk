@@ -24,7 +24,7 @@ import { filterPalette, paletteHTML } from './palette.js';
 import { sendBlocked, deferredSaver } from './composer.js';
 import { freshEntries } from './motion.js';
 import { stickyScroll } from './chat-scroll.js';
-import { makeInventory, makeTeamDirectory, listedGroup, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus, memoLast, workingSince, elapsedText } from './model.js';
+import { makeInventory, makeTeamDirectory, listedGroup, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus, memoLast, workingSince, elapsedText, modelInUse } from './model.js';
 import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
 import { enterAction, SEND_DEDUPE_MS } from './keys.js';
 import { createTerminalView } from './terminal-view.js';
@@ -293,7 +293,11 @@ const needsAttention = term => ['blocked','error'].includes(term.status) || ques
 const localMachine = () => snapshot.isolated ? copy('local') : snapshot.localMachine || mainMachineLabel(snapshot.tasks?.machines||[],copy) || copy('local');
 const machineFor = term => term.machine || localMachine();
 const agentName = term => ({'codex':'Codex','claude-code':'Claude Code'}[term?.agent] || '');
-const agentLabel = term => [agentName(term),term?.modelOptions?.reportedModel].filter(Boolean).join(' · ');
+// The model it works with ("gpt-6.1-sol xhigh"): reported, else launch flags, else the local config default.
+const modelText = term => { const {model,effort}=modelInUse(term?.modelOptions); return model?model+(effort?' '+effort:''):''; };
+const modelTitle = term => { const {source}=modelInUse(term?.modelOptions); return source?copy('modelSource_'+source):''; };
+const modelChip = (term,cls) => { const text=modelText(term); return text?'<small class="'+cls+'" title="'+escape(modelTitle(term))+'">'+escape(text)+'</small>':''; };
+const agentLabel = term => [agentName(term),modelText(term)].filter(Boolean).join(' · ');
 const portraitProvider=term=>term?.agent==='codex'?'codex':term?.agent==='claude-code'?'claude':null;
 const characterID=term=>{
   const role=legacyDraftKey(term);
@@ -641,7 +645,7 @@ function renderRooms(){
       direct:sessionKey(term), selected:!selected&&sessionKey(term)===sessionKey(active()),
       title, shortTitle, team:team===title?'':team,
       icon:agentPortrait(term,busyNow(term),true,busyNow(term))||avatar(shortTitle), at:entries.at(-1)?.at||0,
-      preview:latest?snippet(latest.text||copy('attachedImages')):'', state:memberStatus(term), elapsed:elapsedHTML(term),
+      preview:latest?snippet(latest.text||copy('attachedImages')):'', state:memberStatus(term), elapsed:elapsedHTML(term), model:modelChip(term,'chat-model'),
       pending, indicator:presence(term), archived:term.state==='archived'
     });
   }
@@ -764,7 +768,7 @@ function conversationItem(row,pinned){
       +(pinnedRole?'<span class="chat-team-tag">'+escape(row.shortTitle||row.title)+'</span>':tag||count)
     :row.icon+'<span class="room-preview-copy"><span class="conversation-heading"><span class="room-title">'
       +title+'</span>'+tag+'</span>'
-      +(row.preview||row.state||row.elapsed?'<small class="room-preview">'+(row.elapsed||'')+escape(row.preview||row.state||'')+'</small>':'')
+      +(row.preview||row.state||row.elapsed||row.model?'<small class="room-preview">'+(row.model||'')+(row.elapsed||'')+escape(row.preview||row.state||'')+'</small>':'')
       +'</span><span class="room-signals">'+count+signals+'</span>';
   return '<div class="'+(pinned?'pinned-tile':'conversation-row')+(chatHidden(row,pref)?' hidden-conversation':'')+'" data-conversation="'+escape(row.key)+'"'+(chatHidden(row,pref)?'':' draggable="true"')+'><button class="'
     +(pinned?'pinned-open':'room-row')+'" type="button"'
@@ -784,7 +788,7 @@ function renderGroupMembers(room){
   if(group.hidden)return;
   const member=term=>{
     const name=term.roleLabel||term.label;
-    const status=[agentName(term),memberStatus(term)].filter(Boolean).join(' · ');
+    const status=[agentLabel(term),memberStatus(term)].filter(Boolean).join(' · ');
     return '<button class="roster-member" type="button" title="'+escape(term.label)+'"'
       +(term.address?' data-group-member="'+escape(sessionKey(term))+'"':' disabled')+'>'
       +(agentPortrait(term,busyNow(term)||assignmentActive(term),false,busyNow(term))||avatar(name))+'<span><b>'+escape(name)+'</b><small>'+escape(status)+elapsedHTML(term)+'</small></span></button>';
@@ -1397,7 +1401,7 @@ function railNode(node){
   const face=node.address==='desk'?avatar(copy('you')):(term&&agentPortrait(term,working))||leadFaceHTML({engine:'neutral',resting:true});
   const label=working?copy('flowWorking'):state==='waiting'&&node.waitingFor?copy('flowWaitingFor').replace('{name}',()=>railName({address:node.waitingFor,role:''})):copy('chainState_'+state);
   return '<div class="hr-node" data-state="'+escape(state)+'"'+(node.address==='desk'?' data-desk':'')+(node.sessionActivity?' data-activity="'+escape(node.sessionActivity)+'"':'')+'><span class="hr-face">'+face+(working?RAIL_HAMMER:'')+'</span>'
-    +'<b class="hr-name">'+escape(railName(node))+'</b><small class="hr-state">'+(RAIL_ICONS[state]||'')+escape(label)+(working?elapsedHTML(term):'')+'</small></div>';
+    +'<b class="hr-name">'+escape(railName(node))+'</b><small class="hr-state">'+(RAIL_ICONS[state]||'')+escape(label)+(working?elapsedHTML(term):'')+'</small>'+(node.address==='desk'?'':modelChip(term,'hr-model'))+'</div>';
 }
 const railLink=link=>'<span class="hr-link" data-kind="'+escape(link.kind)+'" aria-hidden="true"><svg viewBox="0 0 100 12" preserveAspectRatio="none"><path d="M0 6H100"/></svg><i class="hr-head"></i><i class="hr-packet"></i></span>';
 function railRow(nodes,links,hidden=0,hiddenAt=-1,key=''){
@@ -1604,8 +1608,7 @@ function detail() {
   renderGroupMembers(room);
   $('[data-tab=chat]').hidden=Boolean(room);
   $('[data-tab=chat]').textContent=copy(page==='conversations'?'personalChats':'chat');
-  const launchModel=agentName(term)&&!term.modelOptions?.reportedModel&&term.modelOptions?.launchModel;
-  $('#launchModel').textContent=launchModel?copy('launchModel')+' · '+launchModel:'';
+  $('#launchModel').textContent='';   // the model is part of the line above now
   $('#targetPath').title=term ? [machineFor(term),term.location?.space,term.location?.tab,term.address].filter(Boolean).join(' › ') : '';
   $('#sessionState').textContent = term ? copy(effectiveStatus(term)) : '';
   if (selectedTab==='activity' && page==='conversations') selectedTab=room?'team':'chat';
