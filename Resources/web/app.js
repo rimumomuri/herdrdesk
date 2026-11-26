@@ -874,7 +874,8 @@ function renderTaskBoard(room,show){
   if(panel.hidden)return;
   const name=address=>{const term=boardOwnerTerm(address);return term?.label||address;};
   const portrait=address=>{const term=boardOwnerTerm(address);return term?agentPortrait(term):'';};
-  const columns=boardColumns(team,Date.now());
+  // Finished cards stay while their worker is still live; once it has ended they leave the board.
+  const columns=boardColumns(team,Date.now(),{ownerLive:owner=>inventory.some(term=>term.address===owner.address&&term.state==='live'&&(!owner.session||!term.session||term.session===owner.session))});
   const scrolled=panel.querySelector('.board-inner');
   const offset=scrolled?[scrolled.scrollTop,scrolled.scrollLeft]:null;
   const changed=setPanel('#taskBoard','<button type="button" class="board-toggle" aria-controls="boardBody">'

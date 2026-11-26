@@ -96,3 +96,13 @@ test('the collapsed board shows one line of per-column counts, each column label
   assert.match(html, /data-board-state="blocked">막힘 <b>1<\/b>/);
   assert.match(html, /data-board-state="review" data-empty="true">검토 <b>0<\/b>/);
 });
+
+test('a finished card stays only while its worker is still there', () => {
+  const t = { cards: [card('d-1', 'done', { owner: { address: 't2' } }), card('d-2', 'done', { owner: { address: 't9' } }),
+    card('d-3', 'done', { owner: null }), card('w-1', 'working', { owner: { address: 't9' } })] };
+  const live = owner => owner?.address === 't2';
+  const cols = boardColumns(t, now, { ownerLive: live });
+  assert.deepEqual(cols.at(-1).cards.map(c => c.id), ['d-1']);
+  assert.deepEqual(cols[1].cards.map(c => c.id), ['w-1']);   // only finished cards are dropped
+  assert.equal(boardColumns(t, now).at(-1).cards.length, 3);   // without the check, as before
+});
