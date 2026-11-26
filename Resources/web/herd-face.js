@@ -23,13 +23,14 @@ function herdRingLight(left, top, working) {
     + '<animateMotion dur="' + dur + '" repeatCount="indefinite" path="' + path + '"/>'
     + '<animate attributeName="opacity" dur="' + dur + '" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;0.05;0.45;0.5;1"/></g></g>';
 }
-// Where agents sit inside the open mouth (cell units), by how many there are.
+// Where agents sit in the open mouth (cell units), by how many there are: big, crowding the mouth, and the last
+// one (drawn on top) spilling out over the left lip.
 const HERD_SLOTS = [
   [],
-  [[140, 196, 84]],
-  [[112, 205, 66], [184, 212, 66]],
-  [[118, 200, 56], [180, 200, 56], [150, 240, 56]],
-  [[116, 196, 52], [174, 196, 52], [122, 244, 52], [180, 244, 52]],
+  [[112, 182, 120]],
+  [[160, 172, 104], [70, 206, 104]],
+  [[150, 166, 90], [190, 222, 90], [66, 214, 90]],
+  [[128, 164, 80], [196, 196, 80], [134, 240, 80], [60, 212, 80]],
 ];
 
 /** A worker spawned for a task card ("<team>-<role>-<n>", or a spawned session with a team role). */
@@ -64,7 +65,7 @@ export function leadFaceHTML({ engine = 'codex', mouth = [], resting = false, fr
   const left = column * HERD_LEADS.cell, top = row * HERD_LEADS.cell, [cx, cy, side] = HERD_LEADS.crop;
   const slots = mouthSlots(mouth.length);
   const inside = slots.map((slot, index) => slot.more
-    ? '<g class="herd-mouth-more">' + [0, 1, 2].map(dot => '<circle cx="' + (left + slot.x + 10 + dot * 16) + '" cy="' + (top + slot.y + slot.size / 2) + '" r="5.5" fill="#f4efe6"/>').join('') + '</g>'
+    ? '<g class="herd-mouth-more">' + [-1, 0, 1].map(dot => '<circle cx="' + (left + slot.x + slot.size / 2 + dot * slot.size * 0.27).toFixed(1) + '" cy="' + (top + slot.y + slot.size / 2) + '" r="' + (slot.size * 0.1).toFixed(1) + '" fill="#f4efe6" stroke="#191a26" stroke-width="3"/>').join('') + '</g>'
     : herdAgentImage(herdEngine(mouth[index]), left + slot.x, top + slot.y, slot.size,
       ' class="herd-mouth-agent"' + (index >= slots.length - fresh ? ' data-new="true"' : ''))).join('');
   return '<span class="agent-portrait" data-face="lead" data-frame="' + frame + '" data-row="' + row + '" data-sleep="' + (frame === 'sleep') + '" aria-hidden="true">'

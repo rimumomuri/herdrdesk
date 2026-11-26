@@ -29,7 +29,12 @@ test('up to four agents fit in the mouth; more shows three and a "more" mark', (
   const many = mouthSlots(7);
   assert.equal(many.length, 4);
   assert.equal(many.filter(slot => slot.more).length, 1);
-  for (const slot of mouthSlots(4)) assert.ok(slot.x >= 100 && slot.x + slot.size <= 270 && slot.y >= 175 && slot.y + slot.size <= 300, JSON.stringify(slot));
+  // big enough to read, filling the mouth and spilling a little over the lip, never off the sheep
+  for (const n of [1, 2, 3, 4]) for (const slot of mouthSlots(n)) {
+    assert.ok(slot.x >= 55 && slot.x + slot.size <= 295 && slot.y >= 160 && slot.y + slot.size <= 330, JSON.stringify(slot));
+    assert.ok(slot.size >= 78, 'readable: ' + JSON.stringify(slot));
+  }
+  assert.ok(mouthSlots(2).some(slot => slot.x < 85), 'one agent sticks out over the left lip');
 });
 
 test('the face markup names its frame and holds one image per agent in the mouth', () => {
