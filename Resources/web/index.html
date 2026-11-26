@@ -101,6 +101,10 @@
  <header><div><h2 id="documentTitle"></h2><p id="documentPath"></p></div><button id="documentClose" type="button" data-copy="close"></button></header>
  <article id="documentBody" class="chat-message-body md-document"></article>
 </dialog>
+<dialog id="imageDialog" class="image-dialog" aria-labelledby="imageTitle">
+ <header><div><h2 id="imageTitle"></h2><p id="imageCount"></p></div><button id="imageClose" type="button" data-copy="close"></button></header>
+ <div class="image-stage"><button id="imagePrev" class="image-nav" type="button" data-nav="-1">‹</button><img id="imageView" alt=""><button id="imageNext" class="image-nav" type="button" data-nav="1">›</button></div>
+</dialog>
 <dialog id="chatSectionDialog" class="chat-section-dialog" aria-labelledby="chatSectionTitle">
  <form id="chatSectionForm">
   <h2 id="chatSectionTitle" data-copy="newChatSection"></h2>
