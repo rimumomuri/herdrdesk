@@ -83,6 +83,7 @@ public struct RecoveryRunner {
         var runtime = try collector.collect()
         var plan = Recovery.plan(registry, runtime: runtime, valid: collector.validator(for: registry.roles, runtime: runtime))
         let roles = Dictionary(registry.roles.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
+        var launched: [String: String] = [:]      // roles started in this run -> their new terminal
         for index in plan.indices where plan[index].action == .resume || plan[index].action == .create {
             guard let role = roles[plan[index].key] else { continue }
             do {
@@ -91,7 +92,11 @@ public struct RecoveryRunner {
                 let (action, reason) = Recovery.choose(role, actual, online: online)
                 if action == .skip { plan[index].action = .skip; plan[index].reason = reason; plan[index].terminal = actual?.address; continue }
                 guard action == plan[index].action else { throw RecoveryError("its state changed before the start: \(reason)") }
-                let parent = Self.parentAddress(for: role.parentRole, in: registry, runtime: runtime)
+                let parent = Self.parentAddress(for: role.parentRole, in: registry, runtime: runtime) ?? role.parentRole.flatMap { launched[$0] }
+                // A saved lead that does not run yet: wait for it rather than start the worker on its own.
+                if parent == nil, let lead = role.parentRole, registry.roles.contains(where: { $0.key == lead }) {
+                    throw RecoveryError("its lead is not running yet; recover again once the lead has started")
+                }
                 let args = try Recovery.runArguments(role, runtime: runtime, parent: parent, locale: locale, now: now())
                 let result = hc.run(args, timeout: 60)
                 guard result.code == 0, !result.timedOut, let data = result.out.data(using: .utf8),
@@ -102,6 +107,7 @@ public struct RecoveryRunner {
                 _ = hc.run(["wait", address, "--timeout", "10"], timeout: 20)   // a start is not a finish; the final check decides
                 plan[index].terminal = address
                 plan[index].action = .submitted
+                launched[role.key] = address
             } catch {
                 plan[index].action = .blocked
                 plan[index].reason = "\(error)"
@@ -127,17 +133,9 @@ public struct RecoveryRunner {
         return actual.address
     }
 
-    /// Clears the launch mark of every saved role that is verified running (a slow start that finished later).
-    public func clearLaunchMarks(_ registry: RecoveryRegistry, runtime: RecoveryRuntime) {
-        for role in registry.roles {
-            guard let (current, online) = try? Recovery.resolve(role, in: runtime), let current, current.launching,
-                  Recovery.choose(role, current, online: online).0 == .skip else { continue }
-            _ = hc.run(["label", current.address, "recovery.launching=", "recovery.launching-at="], timeout: 10)
-        }
-    }
-
     /// Once a role runs again, the shell it left behind gives up its role labels. The shell and its input stay.
-    func retire(_ registry: RecoveryRegistry, runtime: RecoveryRuntime) -> [String] {
+    @discardableResult
+    public func retire(_ registry: RecoveryRegistry, runtime: RecoveryRuntime) -> [String] {
         var retired: [String] = []
         for role in registry.roles {
             guard let (current, online) = try? Recovery.resolve(role, in: runtime), let current,

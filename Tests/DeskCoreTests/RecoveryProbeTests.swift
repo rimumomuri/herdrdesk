@@ -61,6 +61,8 @@ final class RecoveryProbeTests: XCTestCase {
         var calls: [[String]] = []
         var resumed = false
         var failRun = false
+        var leadStartsFirst = false   // the first start is a lead that is not verifiable yet
+        var runs = 0
         let sid: String
         init(sid: String) { self.sid = sid }
         func run(_ args: [String], timeout: TimeInterval) -> HcResult {
@@ -79,10 +81,13 @@ final class RecoveryProbeTests: XCTestCase {
                 if script == RecoveryProbe.processScript { return ok("101 1 zsh\n202 1 codex\n") }
                 if script.contains("@codex") { return ok("@codex 202\nn/h/.codex/sessions/a.jsonl\n") }
                 if script.contains("@file") { return ok("@file /h/.codex/sessions/a.jsonl\n\"type\":\"session_meta\"\n\"id\":\"\(sid)\"\n") }
+                if script.contains("%s\\n' 1;") { return ok("@valid 0\ndir\nfile\n\"id\":\"\(sid)\"\n@valid 1\ndir\nfile\n\"id\":\"\(sid)\"\n") }
                 if script.contains("@valid") { return ok("@valid 0\ndir\nfile\n\"id\":\"\(sid)\"\n") }
                 return ok("")
             case "run":
                 if failRun { return HcResult(code: 1, out: "", err: "no such space", timedOut: false) }
+                runs += 1
+                if leadStartsFirst && runs == 1 { return ok(#"{"address":"t8"}"#) }
                 resumed = true
                 return ok(#"{"address":"t9"}"#)
             default: return ok("{}")
@@ -172,5 +177,32 @@ final class RecoveryProbeTests: XCTestCase {
         XCTAssertNotNil(inner)
         XCTAssertNoThrow(try store.exclusively { })
         try? FileManager.default.removeItem(at: folder)
+    }
+
+    func testAWorkerWaitsWhileItsSavedLeadIsNotRunning() throws {
+        let core = FakeCore(sid: sid); core.failRun = true
+        let leadSid = "22222222-2222-3333-4444-555555555555"
+        let lead = RecoveryRole(key: "lead", title: "Lead", machine: nil, agent: "claude-code", sessionId: leadSid, sessionFile: "/p",
+                                cwd: "/Users/me", name: nil, labels: [:], parentRole: nil, lastAddress: "t7", location: nil, bypass: false, savedAt: "")
+        let worker = RecoveryRole(key: "shop-lead", title: "Worker", machine: nil, agent: "codex", sessionId: sid, sessionFile: "/h/.codex/sessions/a.jsonl",
+                                  cwd: "/Users/me/shop", name: nil, labels: [:], parentRole: "lead", lastAddress: "t1", location: nil, bypass: false, savedAt: "")
+        let report = try RecoveryRunner(hc: core, app: nil, locale: "en", now: { "t1" }).restore(RecoveryRegistry(roles: [worker, lead]))
+        XCTAssertEqual(core.calls.filter { $0.first == "run" }.count, 1)              // only the lead was tried
+        XCTAssertEqual(report.roles.first { $0.key == "shop-lead" }?.action, .blocked)
+    }
+
+    func testAWorkerJoinsTheLeadStartedInTheSameRecovery() throws {
+        let core = FakeCore(sid: sid)
+        let leadSid = "22222222-2222-3333-4444-555555555555"
+        let lead = RecoveryRole(key: "lead", title: "Lead", machine: nil, agent: "claude-code", sessionId: leadSid, sessionFile: "/p",
+                                cwd: "/Users/me", name: nil, labels: [:], parentRole: nil, lastAddress: "t7", location: nil, bypass: false, savedAt: "")
+        let worker = RecoveryRole(key: "shop-lead", title: "Worker", machine: nil, agent: "codex", sessionId: sid, sessionFile: "/h/.codex/sessions/a.jsonl",
+                                  cwd: "/Users/me/shop", name: nil, labels: [:], parentRole: "lead", lastAddress: "t1", location: nil, bypass: false, savedAt: "")
+        core.leadStartsFirst = true
+        _ = try RecoveryRunner(hc: core, app: nil, locale: "en", now: { "t1" }).restore(RecoveryRegistry(roles: [worker, lead]))
+        let runs = core.calls.filter { $0.first == "run" }
+        XCTAssertEqual(runs.count, 2)
+        let parent = try XCTUnwrap(runs[1].firstIndex(of: "--parent"))
+        XCTAssertEqual(runs[1][parent + 1], "t8")
     }
 }
