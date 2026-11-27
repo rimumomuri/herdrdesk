@@ -46,6 +46,18 @@ The card board shown in the demo is optional. It appears when you provide an ext
 - **Files in replies.** A link to a saved web page opens in your default browser; a Markdown file opens in an in-app viewer.
 - **Floating companion.** A small character outside the window (also over full-screen video) shows who needs you and who is working. Click it to open HerdrDesk.
 
+## After a reboot: recover your agents
+
+HerdrDesk remembers, on its own, which Codex and Claude Code conversation runs in which terminal: its working folder, its team labels, its lead, and its Herdr space and tab. It saves again whenever agents start, end or move, and as their turns advance. Workers spawned for a task card are not saved, and an agent you close while HerdrDesk is watching is dropped from the list.
+
+After a reboot, when only shells are left, the sidebar shows **N conversations to recover · Recover** above the computer list. It asks once, then resumes exactly those conversations in their saved place and reports what came back and what still needs a look. It also works for agents on connected computers.
+
+- It only resumes the saved conversation (`codex resume <id>` / `claude --resume`). It never replays work, never types into a shell, and never starts a second copy of a conversation that is running or starting.
+- An agent is resumed with the permissions it was running with: approval prompts are skipped again only if its running command skipped them.
+- To find each conversation it reads process lists, the session id in Claude Code's per-process record, and the session id on the first line of the Codex session file the process has open. It never reads conversation contents.
+- The list is stored only on your Mac (`recovery.json` in the HerdrDesk data folder, readable only by you). The settings menu shows how many agents are saved and when, with **Check now**.
+- The same recovery works from a terminal: `HerdrDesk.app/Contents/MacOS/HerdrDesk --recovery check|save|restore`.
+
 ## Privacy
 
 Core is accessed locally and through the remote connections already configured in Herdr. HerdrDesk does not run a cloud service. Terminal output is streamed for the selected session, discarded when observation ends and excluded from saved chat history. Outgoing drafts and local send records are stored on the Mac.
