@@ -39,3 +39,22 @@ export function questionFormHTML(q, view, copy, escape) {
 export function keepTyping(requests, focusedId, live, sending) {
   return live && !sending.has(focusedId) && requests.some(q => q.id === focusedId && q.answerable);
 }
+
+/** What the waiting popup is about, as a key: a hidden popup stays hidden only while this stays the same. */
+export function approvalSignature({ requests = [], troubled = null, kind = '', waiting = null } = {}) {
+  if (requests.length) return 'q:' + requests.map(q => q.id).join(',');
+  if (troubled) return 'trouble:' + kind + ':' + troubled;
+  if (waiting) return 'waiting:' + waiting;
+  return '';
+}
+
+/** The popup shows while something waits, unless the person hid this same item; hidden, a pill brings it back. */
+export function approvalDock(signature, hidden) {
+  if (!signature) return { popup: false, pill: false };
+  return hidden === signature ? { popup: false, pill: true } : { popup: true, pill: false };
+}
+
+export function approvalHeadHTML(count, copy) {
+  return '<div class="approval-head"><span>' + copy('approvalWaitingTitle') + ' <b class="approval-count">' + count + '</b></span>'
+    + '<button type="button" data-approval-hide>' + copy('approvalHide') + '</button></div>';
+}
