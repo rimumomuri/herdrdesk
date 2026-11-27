@@ -18,7 +18,7 @@ import { companionState, companionSummary, featuredAgent } from './companion.js'
 import { agentTrouble, machineTrouble } from './trouble.js';
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest, mainMachineLabel } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText, boardSummaryHTML, BOARD_LABELS } from './task-board.js';
-import { questionFormHTML, questionFilesHTML, keepTyping, approvalSignature, approvalDock, approvalHeadHTML } from './chat-questions.js';
+import { questionFormHTML, questionFilesHTML, keepTyping, approvalSignature, approvalDock, approvalHeadHTML, keepHidden } from './chat-questions.js';
 import { attentionOf, autoUnread, markSeen, snoozeActive, snoozeUntil, nextUrgent, waitingCount } from './triage.js';
 import { filterPalette, paletteHTML } from './palette.js';
 import { sendBlocked, deferredSaver } from './composer.js';
@@ -1615,6 +1615,7 @@ function renderChatContext(term,room) {
   const approval=$('#inlineApproval');
   const troubleKind=troubled?agentTrouble(troubled):'';
   approvalCurrent=page==='conversations'?approvalSignature({requests,troubled:troubled&&sessionKey(troubled),kind:troubleKind,waiting:waiting&&sessionKey(waiting)}):'';
+  approvalHidden=keepHidden(approvalCurrent,approvalHidden);
   const dock=approvalDock(approvalCurrent,approvalHidden);
   approval.hidden=!dock.popup;
   const pill=$('#approvalPill');
@@ -1741,6 +1742,7 @@ function renderWaitingInbox(){
   const items=waitingInboxItems(inventory,snapshot.ledger||{}).filter(item=>!linked.has(item.key));
   const panel=$('#waitingInbox');
   waitingCurrent=items.map(item=>item.key+'@'+item.binding).join('|');
+  waitingHidden=keepHidden(waitingCurrent,waitingHidden);
   const dock=approvalDock(waitingCurrent,waitingHidden);
   panel.hidden=!dock.popup;
   const pill=$('#waitingInboxPill');pill.hidden=!dock.pill;

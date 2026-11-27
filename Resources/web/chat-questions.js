@@ -58,3 +58,6 @@ export function approvalHeadHTML(count, copy) {
   return '<div class="approval-head"><span>' + copy('approvalWaitingTitle') + ' <b class="approval-count">' + count + '</b></span>'
     + '<button type="button" data-approval-hide>' + copy('approvalHide') + '</button></div>';
 }
+
+/** A hidden popup's mark is dropped as soon as something else (or nothing) waits, so a later wait shows again. */
+export const keepHidden = (signature, hidden) => hidden && hidden === signature ? hidden : null;
