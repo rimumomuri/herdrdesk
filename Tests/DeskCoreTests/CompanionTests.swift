@@ -103,8 +103,9 @@ final class CompanionDragTests: XCTestCase {
         let first = drag.move(to: CGPoint(x: 20, y: 10))
         XCTAssertTrue(first.began)
         XCTAssertEqual(first.origin, CGPoint(x: 110, y: 100))
-        // the window shrank when the drag began (bubble closed): the drag continues from its new origin
-        drag.rebase(origin: CGPoint(x: 326, y: 100), at: CGPoint(x: 20, y: 10))
+        // the window shrank when the drag began (bubble closed): the whole movement so far still counts, from its new origin
+        drag.rebase(origin: CGPoint(x: 316, y: 100))
+        XCTAssertEqual(drag.move(to: CGPoint(x: 20, y: 10)).origin, CGPoint(x: 326, y: 100))
         let second = drag.move(to: CGPoint(x: 30, y: 15))
         XCTAssertFalse(second.began)
         XCTAssertEqual(second.origin, CGPoint(x: 336, y: 105))

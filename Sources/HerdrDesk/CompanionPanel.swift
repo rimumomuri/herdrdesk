@@ -29,9 +29,10 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
             let now = NSEvent.mouseLocation
             var step = drag.move(to: now)
             if step.began {
-                // close the bubble once, then follow the pointer from the smaller window's own origin
+                // close the bubble once; the window has not moved yet, so its new origin is where it stood at the press
+                // (at its new size) and the pointer's whole movement since then still applies
                 onDragStart?()
-                drag.rebase(origin: window.frame.origin, at: now)
+                drag.rebase(origin: window.frame.origin)
                 step = drag.move(to: now)
             }
             if let origin = step.origin { window.setFrameOrigin(origin) }

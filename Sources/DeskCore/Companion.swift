@@ -82,10 +82,11 @@ public struct CompanionDrag {
         return (began, dragging ? CGPoint(x: startOrigin.x + dx, y: startOrigin.y + dy) : nil)
     }
 
-    /// The window changed size when the drag began: keep following from its new origin, without a jump.
-    public mutating func rebase(origin: CGPoint, at point: CGPoint) {
+    /// The window changed size when the drag began (the window's origin at the press, seen at its new size):
+    /// the pointer's whole movement since the press still applies.
+    public mutating func rebase(origin: CGPoint) {
         guard start != nil else { return }
-        start = point; startOrigin = origin
+        startOrigin = origin
     }
 
     public mutating func release() -> Outcome {
