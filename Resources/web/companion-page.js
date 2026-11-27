@@ -17,6 +17,8 @@ function nudge() {
 }
 
 window.companion = {
+  /** The same page draws the stat panel's own window: there it shows only the panel, always. */
+  panelOnly() { root.classList.add('panel-only'); },
   /** state: {mood, count, working, flash, flashAt, lines, face: {provider, kind: lead|agent, mouth: [engine], sleeping, working} | null} */
   show(state) {
     const moodChanged = current?.mood !== state.mood;
@@ -43,7 +45,12 @@ window.companion = {
     flash.hidden = !state.flash;
     flash.dataset.kind = state.flash || '';
     flash.innerHTML = state.flash === 'handoff' ? ARROW : state.flash ? CHECK : '';
-    document.getElementById('companionBubble').innerHTML = (state.lines || []).slice(0, 4).map(line => '<div>' + escapeText(line) + '</div>').join('');
+    // the stat panel when there is something to list, else the short lines
+    const stats = state.stats || [];
+    const lineHTML = (state.lines || []).slice(0, 4).map(line => '<div>' + escapeText(line) + '</div>').join('');
+    // an offline or usage-limit notice stays above the panel; otherwise the panel replaces the short lines
+    document.getElementById('companionBubble').innerHTML = !stats.length ? lineHTML
+      : (['offline', 'limit'].includes(state.mood) ? '<div class="stat-notice">' + lineHTML + '</div>' : '') + statPanelHTML(stats);
     if (state.mood === 'attention') {
       if (moodChanged || state.count > (current?.count || 0)) nudge();
       nudgeTimer ??= setInterval(nudge, NUDGE_EVERY);
@@ -53,5 +60,12 @@ window.companion = {
     }
     current = state;
   },
-  hover(on, right) { root.classList.toggle('hovered', !!on); root.classList.toggle('bubble-right', !!(on && right)); },
+  /** Which corner the sheep keeps while the window is wider or taller (set before the window grows, cleared after it shrinks). */
+  direction(right, down) {
+    root.classList.toggle('bubble-right', !!right);
+    root.classList.toggle('bubble-down', !!down);
+  },
+  /** Shows or hides the panel (after the window has grown, before it shrinks). */
+  reveal(on) { root.classList.toggle('hovered', !!on); },
+  hover(on, right, down) { this.direction(on && right, on && down); this.reveal(on); },
 };

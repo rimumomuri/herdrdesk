@@ -14,6 +14,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
     /// Takes every mouse event over the page: drag to move, click to open, right-click for the menu, hover for the bubble.
     private final class Surface: NSView {
         var onClick: (() -> Void)?, onMenu: ((NSEvent) -> Void)?, onHover: ((Bool) -> Void)?, onMoved: (() -> Void)?, onDragStart: (() -> Void)?
+
         private var drag = CompanionDrag()
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
         override func updateTrackingAreas() {
@@ -27,14 +28,8 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         override func mouseDragged(with event: NSEvent) {
             guard let window else { return }
             let now = NSEvent.mouseLocation
-            var step = drag.move(to: now)
-            if step.began {
-                // close the bubble once; the window has not moved yet, so its new origin is where it stood at the press
-                // (at its new size) and the pointer's whole movement since then still applies
-                onDragStart?()
-                drag.rebase(origin: window.frame.origin)
-                step = drag.move(to: now)
-            }
+            let step = drag.move(to: now)
+            if step.began { onDragStart?() }   // the stat panel closes while the sheep is carried
             if let origin = step.origin { window.setFrameOrigin(origin) }
         }
         override func mouseUp(with event: NSEvent) {
@@ -50,6 +45,19 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         override func rightMouseDown(with event: NSEvent) { onMenu?(event) }
     }
 
+    /// Over the stat panel: notes when the pointer is on it, and lets every event through to the page (so it scrolls).
+    private final class HoverView: NSView {
+        var onHover: ((Bool) -> Void)?
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            trackingAreas.forEach(removeTrackingArea)
+            addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+        }
+        override func mouseEntered(with event: NSEvent) { onHover?(true) }
+        override func mouseExited(with event: NSEvent) { onHover?(false) }
+    }
+
     var onOpen: (() -> Void)?
     var onTurnOff: (() -> Void)?
     private let panel: Panel
@@ -63,8 +71,16 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
     private var enabled = true, attentionOnly = false
     private var idleSince: Date?
     private var snoozedUntil: Date?
-    private var hovering = false
-    private var bubbleRight = false
+    /// The stat panel lives in its own window beside the sheep, so the sheep's window never changes size: resizing a
+    /// window holding a web page shows a frame or two of the old drawing, which flashed on every hover.
+    private let bubble: Panel
+    private let bubbleWeb: WKWebView
+    private let bubbleHover = HoverView()
+    private var bubbleReady = false
+    private var overSheep = false, overBubble = false, carrying = false
+    private var bubbleOpen = false
+    private var closeTimer: Timer?
+    private var bubbleToken = 0
     private var recheck: Timer?
     private var observers: [NSObjectProtocol] = []
 
@@ -76,6 +92,11 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         web = WKWebView(frame: NSRect(x: 0, y: 0, width: side, height: side), configuration: configuration)
+        let bubbleSize = NSRect(x: 0, y: 0, width: CompanionLayout.wide - side, height: side)
+        bubble = Panel(contentRect: bubbleSize, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
+        let bubbleConfiguration = WKWebViewConfiguration()
+        bubbleConfiguration.websiteDataStore = .nonPersistent()
+        bubbleWeb = WKWebView(frame: bubbleSize, configuration: bubbleConfiguration)
         super.init()
         panel.isFloatingPanel = true
         panel.level = .statusBar
@@ -96,10 +117,34 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         content.addSubview(surface)
         panel.contentView = content
         surface.onClick = { [weak self] in self?.onOpen?() }
-        surface.onHover = { [weak self] in self?.setHover($0) }
+        surface.onHover = { [weak self] in self?.overSheep = $0; self?.carrying = false; self?.layoutBubble() }
         surface.onMoved = { [weak self] in self?.savePlace() }
-        surface.onDragStart = { [weak self] in self?.setHover(false) }
+        surface.onDragStart = { [weak self] in self?.carrying = true; self?.layoutBubble() }
         surface.onMenu = { [weak self] in self?.showMenu($0) }
+        for window in [bubble] {
+            window.isFloatingPanel = true
+            window.level = .statusBar
+            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+            window.backgroundColor = .clear
+            window.isOpaque = false
+            window.hasShadow = false
+            window.hidesOnDeactivate = false
+            window.isReleasedWhenClosed = false
+            window.animationBehavior = .none
+        }
+        bubbleWeb.setValue(false, forKey: "drawsBackground")
+        bubbleWeb.navigationDelegate = self
+        let bubbleContent = NSView(frame: bubbleSize)
+        bubbleWeb.autoresizingMask = [.width, .height]
+        bubbleHover.frame = bubbleContent.bounds
+        bubbleHover.autoresizingMask = [.width, .height]
+        bubbleContent.addSubview(bubbleWeb)
+        bubbleContent.addSubview(bubbleHover)
+        bubble.contentView = bubbleContent
+        bubbleHover.onHover = { [weak self] in self?.overBubble = $0; self?.layoutBubble() }
+        // the plain page; once loaded it is switched to panel-only (a URL fragment here made WebKit throw, which cut
+        // the app's launch short before it connected to Herdr)
+        bubbleWeb.loadFileURL(page, allowingReadAccessTo: webFolder)
         let saved = defaults.string(forKey: "companionOrigin").map(NSPointFromString)
         panel.setFrameOrigin(CompanionLayout.origin(saved: saved, screens: Self.screens()))
         web.loadFileURL(page, allowingReadAccessTo: webFolder)
@@ -130,6 +175,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         state = next
         draw()
         refresh()
+        if bubbleOpen { layoutBubble() }   // the rows may have changed: fit the panel window to them
     }
 
     private func refresh() {
@@ -143,7 +189,8 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         if show {
             if !panel.isVisible { panel.orderFrontRegardless() }
         } else if panel.isVisible {
-            setHover(false)
+            overSheep = false; overBubble = false
+            layoutBubble()
             panel.orderOut(nil)
         }
         // wake again when the idle grace or the snooze runs out
@@ -154,31 +201,54 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
     }
 
     private func draw() {
-        guard pageReady, let state else { return }
-        web.callAsyncJavaScript("window.companion.show(state)", arguments: ["state": state], in: nil, in: .page, completionHandler: nil)
+        guard let state else { return }
+        if pageReady { web.callAsyncJavaScript("window.companion.show(state)", arguments: ["state": state], in: nil, in: .page, completionHandler: nil) }
+        if bubbleReady { bubbleWeb.callAsyncJavaScript("window.companion.show(state)", arguments: ["state": state], in: nil, in: .page, completionHandler: nil) }
     }
 
-    private func setHover(_ on: Bool) {
-        guard on != hovering else { return }
-        let sheep = NSRect(origin: sheepOrigin(), size: NSSize(width: CompanionLayout.side, height: CompanionLayout.side))
-        hovering = on
-        bubbleRight = false
-        if on && !((state?["lines"] as? [String])?.isEmpty ?? true) {
-            let open = CompanionLayout.expanded(sheep: sheep, screens: Self.screens())
-            bubbleRight = open.bubbleRight
-            panel.setFrame(open.frame, display: true)
-        } else {
-            panel.setFrame(sheep, display: true)
+    /// Opens the panel while the pointer is on the sheep or on the panel (and nothing is being carried); closes it a
+    /// moment after the pointer leaves both, so moving from the sheep onto the panel keeps it open.
+    private func layoutBubble() {
+        let stats = state?["stats"] as? [[String: Any]] ?? []
+        let lines = (state?["lines"] as? [String]) ?? []
+        let want = (overSheep || overBubble) && !carrying && panel.isVisible && (!stats.isEmpty || !lines.isEmpty)
+        if !want {
+            guard bubbleOpen else { bubbleToken += 1; return }   // an open still waiting on the page is dropped
+            if carrying || !panel.isVisible { closeBubble(); return }
+            closeTimer?.invalidate()
+            closeTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: false) { [weak self] _ in self?.closeBubble() }
+            return
         }
-        if pageReady {
-            web.callAsyncJavaScript("window.companion.hover(on, right)", arguments: ["on": on, "right": bubbleRight], in: nil, in: .page, completionHandler: nil)
+        closeTimer?.invalidate(); closeTimer = nil
+        let rows = stats.map { (($0["rows"] as? [Any])?.count ?? 0) + ((($0["more"] as? String) ?? "").isEmpty ? 0 : 1) }
+        let mood = state?["mood"] as? String ?? ""
+        let notices = ["offline", "limit"].contains(mood) ? lines.count : 0
+        let place = CompanionLayout.bubbleFrame(sheep: panel.frame, screens: Self.screens(),
+                                                height: stats.isEmpty ? nil : CompanionLayout.panelHeight(sections: rows, lines: notices))
+        bubbleToken += 1
+        let token = bubbleToken
+        let show = { [weak self] in
+            guard let self, self.bubbleToken == token, (self.overSheep || self.overBubble), !self.carrying, self.panel.isVisible else { return }
+            if self.bubble.frame != place.frame { self.bubble.setFrame(place.frame, display: true) }
+            if !self.bubble.isVisible { self.bubble.orderFrontRegardless() }
+            self.bubbleOpen = true
         }
+        guard bubbleReady, let state else { show(); return }
+        // the panel window is placed and drawn before it shows (only then is it brought on screen)
+        if !bubble.isVisible, bubble.frame != place.frame { bubble.setFrame(place.frame, display: false) }
+        bubbleWeb.callAsyncJavaScript("window.companion.show(state); window.companion.direction(right, down)",
+                                      arguments: ["state": state, "right": place.right, "down": place.down], in: nil, in: .page) { _ in show() }
     }
 
-    /// The sheep's own place: the right end of the window, or its left end while the bubble opens to the right.
-    private func sheepOrigin() -> NSPoint {
-        NSPoint(x: bubbleRight ? panel.frame.minX : panel.frame.maxX - CompanionLayout.side, y: panel.frame.minY)
+    private func closeBubble() {
+        closeTimer?.invalidate(); closeTimer = nil
+        bubbleToken += 1
+        bubbleOpen = false
+        bubble.orderOut(nil)
     }
+
+    /// The sheep's place: its window never changes size, so it is the window's origin.
+    private func sheepOrigin() -> NSPoint { panel.frame.origin }
 
     private func savePlace() {
         keepOnScreen()
@@ -186,8 +256,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
     }
 
     private func keepOnScreen() {
-        let origin = CompanionLayout.origin(saved: sheepOrigin(), screens: Self.screens())
-        panel.setFrameOrigin(NSPoint(x: bubbleRight ? origin.x : origin.x + CompanionLayout.side - panel.frame.width, y: origin.y))
+        panel.setFrameOrigin(CompanionLayout.origin(saved: sheepOrigin(), screens: Self.screens()))
     }
 
     private func showMenu(_ event: NSEvent) {
@@ -219,12 +288,25 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
     }
 
     func webView(_ view: WKWebView, didFinish navigation: WKNavigation!) {
+        if view === bubbleWeb {
+            view.callAsyncJavaScript("window.companion.panelOnly()", arguments: [:], in: nil, in: .page) { [weak self] _ in
+                self?.bubbleReady = true
+                self?.draw()
+            }
+            return
+        }
         pageReady = true
         draw()
         refresh()
     }
 
     func webViewWebContentProcessDidTerminate(_ view: WKWebView) {
+        if view === bubbleWeb {
+            bubbleReady = false
+            closeBubble()
+            view.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent())
+            return
+        }
         pageReady = false
         refresh()
         view.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent())

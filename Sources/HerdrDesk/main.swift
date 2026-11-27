@@ -162,6 +162,8 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
         let bundleWeb = Bundle.main.resourceURL!.appendingPathComponent("web")
         index = bundleWeb.appendingPathComponent("index.html")
         web.loadFileURL(index, allowingReadAccessTo: bundleWeb)
+        // Connect first: nothing the floating companion does while it is set up may keep the app from reaching Herdr.
+        connect()
         if !isolated {
             let companion = CompanionPanel(webFolder: bundleWeb)
             companion.onOpen = { [weak self] in
@@ -174,7 +176,6 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
             companion.onTurnOff = { [weak self] in self?.call("window.desk.companionOff()", [:]) }
             self.companion = companion
         }
-        connect()
         loadArchivedAttachmentRoles()
         captureIfRequested()
         reportCompatibilityIfRequested()

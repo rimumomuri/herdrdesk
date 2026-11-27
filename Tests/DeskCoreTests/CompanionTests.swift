@@ -89,6 +89,75 @@ final class CompanionTests: XCTestCase {
     }
 }
 
+final class CompanionStatsTests: XCTestCase {
+    func testOnlyKnownSectionsWithShortTextReachThePage() {
+        let long = String(repeating: "가", count: 200)
+        let stats: [[String: Any]] = [
+            ["kind": "working", "title": "진행 중", "count": 6, "more": "+2", "rows": [["name": "킁킁맵 총괄", "meta": "12분 3초"], ["name": long, "meta": long], 7]],
+            ["kind": "script", "title": "x", "rows": []],
+            ["kind": "done", "title": "완료", "count": 1, "rows": [["name": "라인챗봇", "meta": "방금"]]],
+        ]
+        let page = CompanionLayout.pageState(["mood": "working", "stats": stats])?["stats"] as? [[String: Any]] ?? []
+        XCTAssertEqual(page.map { $0["kind"] as? String }, ["working", "done"])
+        let rows = page[0]["rows"] as? [[String: String]] ?? []
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows[0], ["name": "킁킁맵 총괄", "meta": "12분 3초"])
+        XCTAssertEqual(rows[1]["name"]?.count, 60)
+        XCTAssertEqual(page[0]["count"] as? Int, 6)
+    }
+
+    func testThePanelIsTallEnoughForItsRows() {
+        XCTAssertEqual(CompanionLayout.panelHeight(sections: []), CompanionLayout.side)
+        let one = CompanionLayout.panelHeight(sections: [3])
+        let two = CompanionLayout.panelHeight(sections: [3, 1])
+        XCTAssertGreaterThan(one, CompanionLayout.side - 1)
+        XCTAssertGreaterThan(two, one)
+    }
+
+    func testATallPanelOpensDownwardNearTheTopOfTheScreen() {
+        let screen = CGRect(x: 0, y: 0, width: 1440, height: 875)
+        let top = CompanionLayout.expanded(sheep: CGRect(x: 1300, y: 767, width: 84, height: 84), screens: [screen], height: 220)
+        XCTAssertEqual(top.frame.maxY, 851)          // the sheep's top stays put, the panel grows down
+        XCTAssertTrue(top.down)
+        let low = CompanionLayout.expanded(sheep: CGRect(x: 1300, y: 100, width: 84, height: 84), screens: [screen], height: 220)
+        XCTAssertEqual(low.frame.minY, 100)          // grows up
+        XCTAssertFalse(low.down)
+    }
+}
+
+final class CompanionFitTests: XCTestCase {
+    func testAPanelTallerThanEitherSideStaysOnScreenOnTheRoomierSide() {
+        let screen = CGRect(x: 0, y: 0, width: 1440, height: 640)
+        let open = CompanionLayout.expanded(sheep: CGRect(x: 1300, y: 280, width: 84, height: 84), screens: [screen], height: 500)
+        XCTAssertGreaterThanOrEqual(open.frame.minY, screen.minY)
+        XCTAssertLessThanOrEqual(open.frame.maxY, screen.maxY)
+        XCTAssertTrue(open.down)                           // 360 points above the sheep's bottom, 364 below its top: down wins
+        XCTAssertEqual(open.frame.maxY, 364)
+        XCTAssertEqual(open.frame.height, 364)
+    }
+
+    func testOfflineAndLimitLinesAddToThePanelHeight() {
+        XCTAssertGreaterThan(CompanionLayout.panelHeight(sections: [1], lines: 2), CompanionLayout.panelHeight(sections: [1]))
+    }
+}
+
+final class CompanionBubbleWindowTests: XCTestCase {
+    func testThePanelWindowSitsBesideTheSheepWithoutCoveringIt() {
+        let screen = CGRect(x: 0, y: 0, width: 1440, height: 875)
+        let sheep = CGRect(x: 1300, y: 100, width: 84, height: 84)
+        let left = CompanionLayout.bubbleFrame(sheep: sheep, screens: [screen], height: 200)
+        XCTAssertEqual(left.frame.maxX, sheep.minX)
+        XCTAssertEqual(left.frame.width, CompanionLayout.wide - CompanionLayout.side)
+        XCTAssertEqual(left.frame.minY, 100)                 // grows up from the sheep's bottom
+        XCTAssertEqual(left.frame.height, 200)
+        XCTAssertFalse(left.right); XCTAssertFalse(left.down)
+        let edge = CompanionLayout.bubbleFrame(sheep: CGRect(x: 20, y: 767, width: 84, height: 84), screens: [screen], height: 200)
+        XCTAssertEqual(edge.frame.minX, 104)                 // opens to the right of a sheep at the left edge
+        XCTAssertEqual(edge.frame.maxY, 851)                 // and down from a sheep at the top
+        XCTAssertTrue(edge.right); XCTAssertTrue(edge.down)
+    }
+}
+
 final class CompanionDragTests: XCTestCase {
     func testASmallWiggleIsAClickNotADrag() {
         var drag = CompanionDrag()

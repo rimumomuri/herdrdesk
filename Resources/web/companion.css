@@ -1,12 +1,13 @@
 /* The floating companion window: a transparent page with one sheep at its right edge and a bubble that opens on hover. */
 html, body { margin:0; height:100%; overflow:hidden; background:transparent!important }
 body.companion-body { display:block; min-height:0; min-width:0 }
-.companion { position:fixed; inset:0; display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:0 10px;
-  font:12px -apple-system, system-ui, sans-serif; color:var(--ink); user-select:none; -webkit-user-select:none; cursor:default }
+/* Everything is pinned to a corner of the window: the sheep to its own corner, the panel beside it. The window grows
+   and shrinks around the sheep for the panel, so the sheep never moves on screen, whatever the timing of a resize. */
+.companion { position:fixed; inset:0; font:12px -apple-system, system-ui, sans-serif; color:var(--ink);
+  user-select:none; -webkit-user-select:none; cursor:default }
 .companion[hidden] { display:none }
-.companion.bubble-right { flex-direction:row-reverse; justify-content:flex-end }   /* reversed: flex-end is the left edge, where the sheep stays */
 /* No backdrop: the character alone, with a soft shadow so it reads on light and dark screens alike. */
-.companion-figure { position:relative; flex:none; width:64px; height:64px; display:grid; place-items:center;
+.companion-figure { position:absolute; right:10px; bottom:10px; width:64px; height:64px; display:grid; place-items:center;
   background:transparent; filter:drop-shadow(0 2px 5px #000b) drop-shadow(0 0 1px #000c); transition:opacity .2s ease, filter .2s ease }
 .companion .sheep { width:52px; height:40px }
 .companion .agent-portrait { width:62px; height:62px }
@@ -35,3 +36,36 @@ body.companion-body { display:block; min-height:0; min-width:0 }
 @keyframes companion-ring { 0% { outline:2px solid #e5484d; outline-offset:0 } 100% { outline:2px solid #e5484d00; outline-offset:12px } }
 @keyframes companion-pop { from { transform:scale(.85); opacity:0 } to { transform:none; opacity:1 } }
 @media(prefers-reduced-motion:reduce) { .companion, .companion * { animation:none!important; transition:none!important } }
+/* Hover stat panel: who waits on you, who works and for how long, who just finished. The window grows to fit it; the
+   sheep stays where it was, at the bottom (or the top while the panel opens downward). */
+.companion.bubble-right .companion-figure { left:10px; right:auto }
+.companion.bubble-down .companion-figure { top:10px; bottom:auto }
+.companion-bubble { position:absolute; right:84px; bottom:10px; box-sizing:border-box }
+.companion.bubble-right .companion-bubble { left:84px; right:auto }
+.companion.bubble-down .companion-bubble { top:10px; bottom:auto }
+.companion-bubble:has(.stat-panel) { max-width:282px; width:282px; padding:8px 10px; box-sizing:border-box; max-height:calc(100vh - 12px); overflow-y:auto }
+.stat-notice { margin-bottom:6px; padding-bottom:6px; border-bottom:1px solid #ffffff1a; color:#ffd59c }
+/* minmax(0,1fr): a long name may not widen the grid past the panel (a grid column grows to its longest unbroken line
+   otherwise, pushing the counts and the times out of sight); the name is cut with an ellipsis instead. */
+.stat-panel { display:grid; grid-template-columns:minmax(0,1fr); gap:7px }
+.stat-section { min-width:0 }
+.stat-section header { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:.02em; color:#d7d7df; margin-bottom:3px }
+.stat-section header b { margin-left:auto; min-width:18px; padding:0 6px; border-radius:9px; text-align:center; font-size:10.5px; line-height:16px; color:#101012 }
+.stat-dot { width:7px; height:7px; border-radius:50%; flex:none }
+.stat-row { display:flex; align-items:baseline; gap:8px; padding:1px 0 1px 13px; font-size:12px; line-height:17px }
+.stat-row span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#f1f1f5 }
+.stat-row time { flex:none; font-variant-numeric:tabular-nums; font-size:11px; color:#a9a9b4 }
+.stat-more { padding-left:13px; font-size:11px; color:#8c8c96 }
+.stat-section[data-kind=working] .stat-dot, .stat-section[data-kind=working] header b { background:#3ccf7e }
+.stat-section[data-kind=working] .stat-dot { animation:stat-breathe 1.6s ease-in-out infinite }
+.stat-section[data-kind=working] time { color:#7fe3ab }
+.stat-section[data-kind=done] .stat-dot, .stat-section[data-kind=done] header b { background:#6fa8ff }
+.stat-section[data-kind=waiting] .stat-dot, .stat-section[data-kind=waiting] header b { background:#f0a23a }
+.stat-section[data-kind=waiting] .stat-row span { color:#ffd59c }
+@keyframes stat-breathe { 50% { opacity:.35 } }
+@media(prefers-reduced-motion:reduce) { .stat-section[data-kind=working] .stat-dot { animation:none } }
+/* The stat panel's own window: no sheep, the panel always shown, hugging the side where the sheep's window sits. */
+.companion.panel-only .companion-figure { display:none }
+.companion.panel-only .companion-bubble { display:block; right:4px; animation:none }
+.companion.panel-only.bubble-right .companion-bubble { left:4px; right:auto }
+.companion.panel-only .companion-bubble:empty { display:none!important }
