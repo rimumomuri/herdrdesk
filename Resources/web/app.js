@@ -1,7 +1,7 @@
 import { chatImageMarkup, ChatImagePreviews, chatImageHistory } from './chat-images.js';
 import { chatMarkdownBlocks } from './chat-markdown.js';
 import { markdownDocumentHTML } from './md-view.js';
-import { waitingInboxItems, waitingInboxMarkup } from './waiting-inbox.js';
+import { waitingInboxItems, waitingInboxMarkup, notShownInChat } from './waiting-inbox.js';
 import { lineageMarkup, linkedWaiting } from './lineage.js';
 import { chatShortcutSegments } from './chat-shortcuts.js';
 import { portraitArtwork, withWorkTool, sheepStyles, sheepCoats, resolveSheepStyle, sheepAccessories, resolveSheepAccessory } from "./portrait.js";
@@ -1740,9 +1740,10 @@ function detail() {
 
 let waitingExpiryTimer;
 // The top waiting list the person hid (its items): it stays hidden until the list changes.
-let waitingHidden=null, waitingCurrent='';
-$('#waitingInboxHide').addEventListener('click',()=>{waitingHidden=waitingCurrent;$('#waitingInbox').hidden=true;$('#waitingInboxPill').hidden=!waitingCurrent;});
-$('#waitingInboxPill').addEventListener('click',()=>{waitingHidden=null;$('#waitingInboxPill').hidden=true;$('#waitingInbox').hidden=!waitingCurrent;});
+// The top list opens only when asked (its pill in the top bar); what the open conversation already shows is left out.
+let waitingOpen=false, waitingCurrent='';
+$('#waitingInboxHide').addEventListener('click',()=>{waitingOpen=false;$('#waitingInbox').hidden=true;$('#waitingInboxPill').hidden=!waitingCurrent;});
+$('#waitingInboxPill').addEventListener('click',()=>{waitingOpen=true;$('#waitingInboxPill').hidden=true;$('#waitingInbox').hidden=!waitingCurrent;});
 function renderWaitingInbox(){
   clearTimeout(waitingExpiryTimer);
   const now=Date.now(),expiry=[...inventory.map(term=>Date.parse(term.labels?.['ask.expires'])),
@@ -1750,14 +1751,15 @@ function renderWaitingInbox(){
   if(expiry.length)waitingExpiryTimer=setTimeout(()=>render(),Math.min(2147483647,Math.max(1,Math.min(...expiry)-now+1)));
   const messages=[...Object.values(legacyMessages).flat(),...deliveries];
   const linked=new Set(linkedWaiting(snapshot.lineage,inventory,snapshot.ledger||{}).filter(({root})=>messages.some(message=>message.id===root.originRequestId&&message.conversationId===root.conversationId)).map(item=>item.row.key));
-  const items=waitingInboxItems(inventory,snapshot.ledger||{}).filter(item=>!linked.has(item.key));
+  const room=currentRoom(), term=page==='conversations'?active():null;
+  const inChat=new Set([term,...(room?.members||[])].filter(Boolean).map(member=>member.address));
+  const items=notShownInChat(waitingInboxItems(inventory,snapshot.ledger||{}).filter(item=>!linked.has(item.key)),inChat);
   const panel=$('#waitingInbox');
   waitingCurrent=items.map(item=>item.key+'@'+item.binding).join('|');
-  waitingHidden=keepHidden(waitingCurrent,waitingHidden);
-  const dock=approvalDock(waitingCurrent,waitingHidden);
-  panel.hidden=!dock.popup;
-  const pill=$('#waitingInboxPill');pill.hidden=!dock.pill;
-  const pillText=copy('approvalWaitingTitle')+' '+items.length+' · '+copy('approvalShow');
+  if(!items.length)waitingOpen=false;
+  panel.hidden=!(waitingOpen&&items.length);
+  const pill=$('#waitingInboxPill');pill.hidden=waitingOpen||!items.length;
+  const pillText=copy('waitingElsewhere').replace('{n}',()=>String(items.length));
   if(pill.textContent!==pillText)pill.textContent=pillText;
   $('#waitingInboxCount').textContent=copy('waitingRegistered')+' '+items.filter(item=>item.kind==='question').length+' · '+copy('waitingUnknown')+' '+items.filter(item=>item.kind==='blocked').length;
   const focused=document.activeElement?.dataset.inboxKey;

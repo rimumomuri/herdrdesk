@@ -71,3 +71,12 @@ test('I04 registered origin and deep linked target have separate visible identit
   const unknown=waitingInboxMarkup(items.filter(item=>item.kind==='blocked'),key=>key,true,now);
   assert.equal((unknown.match(/data-waiting-identity/g)||[]).length,1);
 });
+
+test('a waiting item already shown in the open conversation is left out of the top list', async () => {
+  const {notShownInChat} = await import('../Resources/web/waiting-inbox.js');
+  const items = [{key: 'a', actor: {address: 't1'}, target: {address: 't1'}}, {key: 'b', actor: {address: 't9'}, target: {address: 't2'}},
+    {key: 'c', actor: {address: 't7'}, target: null}];
+  assert.deepEqual(notShownInChat(items, new Set(['t1'])).map(i => i.key), ['b', 'c']);
+  assert.deepEqual(notShownInChat(items, new Set(['t2'])).map(i => i.key), ['a', 'c']);
+  assert.deepEqual(notShownInChat(items, new Set()).map(i => i.key), ['a', 'b', 'c']);
+});

@@ -70,3 +70,12 @@ test('a usage limit shows as its own mood below needs-you and offline but above 
 test('while at a usage limit the face is the limited agent', () => {
   assert.equal(featuredAgent({mood:'limit', limitKey:'l', workingKeys:['w'], previousKey:'p'}), 'l');
 });
+
+test('the floating sheep has no backdrop circle, only a shadow so it reads on any screen', async () => {
+  const {readFileSync} = await import('node:fs');
+  const css = readFileSync(new URL('../Resources/web/companion.css', import.meta.url), 'utf8');
+  const figure = css.match(/\.companion-figure \{[^}]*\}/)[0];
+  assert.match(figure, /background:transparent/);
+  assert.doesNotMatch(figure, /border-radius:50%/);
+  assert.match(css, /drop-shadow/);
+});

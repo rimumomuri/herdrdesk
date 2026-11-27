@@ -88,3 +88,37 @@ final class CompanionTests: XCTestCase {
         XCTAssertFalse(show("limit", attentionOnly: true))
     }
 }
+
+final class CompanionDragTests: XCTestCase {
+    func testASmallWiggleIsAClickNotADrag() {
+        var drag = CompanionDrag()
+        drag.press(at: CGPoint(x: 10, y: 10), origin: CGPoint(x: 100, y: 100))
+        XCTAssertNil(drag.move(to: CGPoint(x: 12, y: 11)).origin)
+        XCTAssertEqual(drag.release(), .click)
+    }
+
+    func testDraggingStartsOnceThenFollowsTheMouseWithoutAJump() {
+        var drag = CompanionDrag()
+        drag.press(at: CGPoint(x: 10, y: 10), origin: CGPoint(x: 100, y: 100))
+        let first = drag.move(to: CGPoint(x: 20, y: 10))
+        XCTAssertTrue(first.began)
+        XCTAssertEqual(first.origin, CGPoint(x: 110, y: 100))
+        // the window shrank when the drag began (bubble closed): the drag continues from its new origin
+        drag.rebase(origin: CGPoint(x: 326, y: 100), at: CGPoint(x: 20, y: 10))
+        let second = drag.move(to: CGPoint(x: 30, y: 15))
+        XCTAssertFalse(second.began)
+        XCTAssertEqual(second.origin, CGPoint(x: 336, y: 105))
+        XCTAssertEqual(drag.release(), .moved)
+    }
+
+    func testHoverChangesAreIgnoredWhileTheButtonIsDown() {
+        var drag = CompanionDrag()
+        XCTAssertTrue(drag.acceptsHover)
+        drag.press(at: .zero, origin: .zero)
+        XCTAssertFalse(drag.acceptsHover)
+        _ = drag.move(to: CGPoint(x: 50, y: 0))
+        XCTAssertFalse(drag.acceptsHover)
+        _ = drag.release()
+        XCTAssertTrue(drag.acceptsHover)
+    }
+}
