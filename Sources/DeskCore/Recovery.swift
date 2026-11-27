@@ -155,7 +155,7 @@ public enum Recovery {
 
     static func key(for terminal: ObservedTerminal) -> String {
         if let role = terminal.labels[label], !role.isEmpty { return role }
-        return (terminal.machine ?? "local") + ":" + String((terminal.sessionId ?? "").prefix(8))
+        return (terminal.machine ?? "local") + ":" + (terminal.sessionId ?? "")
     }
 
     static func role(for terminal: ObservedTerminal, key: String, among observed: [ObservedTerminal], now: String) -> RecoveryRole {
@@ -176,7 +176,8 @@ public enum Recovery {
         var byKey: [String: [ObservedTerminal]] = [:]
         for terminal in observed { byKey[key(for: terminal), default: []].append(terminal) }
         var roles: [RecoveryRole] = []
-        var seenNow = seen
+        // What was seen on a machine that is not connected now no longer counts: it may come back rebooted.
+        var seenNow = seen.filter { key in registry.roles.first { $0.key == key }.map { runtime.online($0.machine) } ?? true }
         var handled = Set<String>()
         for old in registry.roles {
             handled.insert(old.key)
@@ -186,7 +187,9 @@ public enum Recovery {
                 if updated.sameSave(as: old) { updated.savedAt = old.savedAt }
                 roles.append(updated)
                 seenNow.insert(old.key)
-            } else if !runtime.online(old.machine) || !seen.contains(old.key) {
+            } else if !runtime.online(old.machine) || !seenNow.contains(old.key) {
+                roles.append(old)
+            } else if runtime.terminals.contains(where: { $0.machine == old.machine && $0.shell && $0.labels[label] == old.key }) {
                 roles.append(old)
             } else if runtime.terminals.contains(where: { $0.machine == old.machine && $0.sessionId == old.sessionId }) {
                 roles.append(old)                                             // still running, only not verifiable now

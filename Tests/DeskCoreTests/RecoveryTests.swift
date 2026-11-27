@@ -144,7 +144,7 @@ final class RecoveryTests: XCTestCase {
     func testAnAgentWithoutARoleLabelGetsAKeyFromItsConversation() {
         let (saved, _) = Recovery.merge(RecoveryRegistry(), runtime: RecoveryRuntime(terminals: [agentTerm("laptop/t3", role: nil)], connected: ["laptop"]),
                                         seen: [], now: "t1")
-        XCTAssertEqual(saved.roles.first?.key, "laptop:01a1cdeb")
+        XCTAssertEqual(saved.roles.first?.key, "laptop:\(sid)")
         XCTAssertEqual(saved.roles.first?.machine, "laptop")
     }
 
@@ -218,5 +218,24 @@ final class RecoveryTests: XCTestCase {
         XCTAssertEqual(Recovery.saveDelay(checked: true, structural: false, turns: true, sinceLast: 10), 50)
         XCTAssertEqual(Recovery.saveDelay(checked: true, structural: false, turns: true, sinceLast: 600), 5)
         XCTAssertNil(Recovery.saveDelay(checked: true, structural: false, turns: false, sinceLast: 0))
+    }
+
+    func testAShellLeftByARebootedRemoteMachineKeepsItsRole() {
+        let before = RecoveryRegistry(roles: [role(machine: "laptop")], savedAt: "t0")
+        let (saved, _) = Recovery.merge(before, runtime: RecoveryRuntime(terminals: [shell("laptop/t1")], connected: ["laptop"]), seen: ["shop-lead"], now: "t2")
+        XCTAssertEqual(saved, before)
+    }
+
+    func testAMachineGoneOfflineForgetsWhatWasSeenThere() {
+        let (_, seen) = Recovery.merge(RecoveryRegistry(roles: [role(machine: "laptop")]), runtime: RecoveryRuntime(terminals: [], connected: []),
+                                       seen: ["shop-lead"], now: "t2")
+        XCTAssertFalse(seen.contains("shop-lead"))
+    }
+
+    func testTwoUnlabelledSessionsWithTheSameStartAreBothSaved() {
+        let a = agentTerm("t1", sid: "01a1cdeb-0000-7390-b24a-dcecf2f47a75", role: nil)
+        let b = agentTerm("t2", sid: "01a1cdeb-1111-7390-b24a-dcecf2f47a75", role: nil)
+        let (saved, _) = Recovery.merge(RecoveryRegistry(), runtime: RecoveryRuntime(terminals: [a, b]), seen: [], now: "t1")
+        XCTAssertEqual(saved.roles.count, 2)
     }
 }

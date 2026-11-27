@@ -195,7 +195,8 @@ public struct RecoveryCollector {
             let program = row["agent"] as? String
             let foreground = detail["foreground"] as? [String: Any]
             var term = ObservedTerminal(address: address, name: detail["name"] as? String,
-                                        labels: detail["labels"] as? [String: String] ?? [:], cwd: detail["cwd"] as? String,
+                                        labels: detail["labels"] as? [String: String] ?? [:],
+                                        cwd: foreground?["cwd"] as? String ?? detail["cwd"] as? String,
                                         parent: detail["parent"] as? String, argv: detail["argv"] as? [String] ?? [],
                                         agent: program.flatMap { Recovery.agents.contains($0) ? $0 : nil }, location: locations[address])
             term.shell = false

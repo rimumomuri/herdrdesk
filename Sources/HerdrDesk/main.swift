@@ -133,7 +133,6 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
     private var recoverySave: DispatchWorkItem?
     private var recoveryBusy = ""          // "", "checking", "restoring"
     private var recoveryReport: RecoveryReport?
-    private var recoveryReportGeneration = -1
     private var recoveryError = ""
     private lazy var recoverySaved = recoveryStore.load()
     private var recoveryEnabled: Bool { !isolated }
@@ -697,18 +696,23 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
         recoverySave = nil
         guard recoveryBusy.isEmpty, connection == "live", let runner = recoveryRunner() else { return }
         let current = generation, seen = recoverySeen, store = recoveryStore
-        let firstCheck = recoveryReport == nil || recoveryReportGeneration != generation
         recoveryLastSave = Date()
         recoveryQueue.async {
             guard let runtime = try? runner.collector.collect() else { return }
             let (registry, seenNow) = Recovery.merge(store.load(), runtime: runtime, seen: seen, now: RecoveryRunner.timestamp())
             if registry != store.load() { try? store.save(registry) }
-            let report = firstCheck ? try? runner.check(registry) : nil
+            // The sidebar follows what runs now (a resume that finished starting, a shell left by a reboot).
+            let report = runner.check(registry, runtime: runtime)
             DispatchQueue.main.async {
                 guard self.generation == current else { return }
-                self.recoverySeen.formUnion(seenNow)
+                self.recoverySeen = seenNow
                 self.recoverySaved = registry
-                if let report { self.recoveryReport = report; self.recoveryReportGeneration = current }
+                if self.recoveryBusy.isEmpty {
+                    var report = report
+                    // After a recovery the sidebar keeps its result (until dismissed) while later checks refresh the roles.
+                    if let last = self.recoveryReport, last.applied { report.applied = true; report.at = last.at }
+                    self.recoveryReport = report
+                }
                 self.push()
             }
         }

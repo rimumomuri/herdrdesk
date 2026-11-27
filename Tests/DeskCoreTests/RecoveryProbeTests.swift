@@ -73,7 +73,7 @@ final class RecoveryProbeTests: XCTestCase {
             case "machine": return ok(#"{"machines":[]}"#)
             case "get":
                 if args[1] == "t1" { return ok(#"{"cwd":"/Users/me","labels":{"recovery.role":"shop-lead","team.id":"shop"},"foreground":{"pid":101},"argv":["/bin/zsh"]}"#) }
-                return ok("{\"cwd\":\"/Users/me/shop\",\"labels\":{\"recovery.role\":\"shop-lead\",\"recovery.launching\":\"\(sid)\"},\"foreground\":{\"pid\":202},\"argv\":[\"/bin/zsh\"]}")
+                return ok("{\"cwd\":\"/Users/me\",\"labels\":{\"recovery.role\":\"shop-lead\",\"recovery.launching\":\"\(sid)\"},\"foreground\":{\"pid\":202,\"cwd\":\"/Users/me/shop\"},\"argv\":[\"/bin/zsh\"]}")
             case "exec":
                 let script = args.last ?? ""
                 if script == RecoveryProbe.processScript { return ok("101 1 zsh\n202 1 codex\n") }
@@ -137,5 +137,13 @@ final class RecoveryProbeTests: XCTestCase {
         let report = try RecoveryRunner(hc: core, app: nil, locale: "en", now: { "t1" }).restore(RecoveryRegistry(roles: [role]))
         XCTAssertEqual(report.roles.first?.action, .blocked)
         XCTAssertTrue(report.roles.first?.reason.contains("no such space") ?? false)
+    }
+
+    func testTheAgentsOwnFolderIsSavedNotTheShellsStartFolder() throws {
+        let runtime = try RecoveryCollector(hc: FakeCore(sid: sid), app: nil).collect()
+        let core = FakeCore(sid: sid); core.resumed = true
+        let resumed = try RecoveryCollector(hc: core, app: nil).collect()
+        XCTAssertEqual(runtime.terminal("t1")?.cwd, "/Users/me")
+        XCTAssertEqual(resumed.terminal("t9")?.cwd, "/Users/me/shop")
     }
 }

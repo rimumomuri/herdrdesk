@@ -56,7 +56,11 @@ public struct RecoveryRunner {
     }
 
     public func check(_ registry: RecoveryRegistry) throws -> RecoveryReport {
-        let runtime = try collector.collect()
+        try check(registry, runtime: collector.collect())
+    }
+
+    /// The same check on a picture already collected (the automatic save reuses its own).
+    public func check(_ registry: RecoveryRegistry, runtime: RecoveryRuntime) -> RecoveryReport {
         let plan = Recovery.plan(registry, runtime: runtime, valid: collector.validator(for: registry.roles, runtime: runtime))
         return RecoveryReport(at: now(), applied: false, roles: plan, ready: plan.allSatisfy { $0.action == .skip }, retired: [])
     }
