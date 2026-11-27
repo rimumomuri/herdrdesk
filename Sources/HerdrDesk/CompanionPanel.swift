@@ -14,6 +14,9 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
     /// Takes every mouse event over the page: drag to move, click to open, right-click for the menu, hover for the bubble.
     private final class Surface: NSView {
         var onClick: (() -> Void)?, onMenu: ((NSEvent) -> Void)?, onHover: ((Bool) -> Void)?, onMoved: (() -> Void)?, onDragStart: (() -> Void)?
+        /// The page underneath: scrolling goes to it, so a stat panel cut to the screen can be scrolled.
+        weak var scrollTarget: NSView?
+        override func scrollWheel(with event: NSEvent) { scrollTarget?.scrollWheel(with: event) }
         private var drag = CompanionDrag()
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
         override func updateTrackingAreas() {
@@ -100,6 +103,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         surface.onHover = { [weak self] in self?.setHover($0) }
         surface.onMoved = { [weak self] in self?.savePlace() }
         surface.onDragStart = { [weak self] in self?.setHover(false) }
+        surface.scrollTarget = web
         surface.onMenu = { [weak self] in self?.showMenu($0) }
         let saved = defaults.string(forKey: "companionOrigin").map(NSPointFromString)
         panel.setFrameOrigin(CompanionLayout.origin(saved: saved, screens: Self.screens()))
