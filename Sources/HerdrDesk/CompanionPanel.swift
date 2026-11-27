@@ -73,6 +73,9 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
     private var hovering = false
     private var bubbleRight = false
     private var bubbleDown = false
+    /// The corner the current window frame actually keeps the sheep at (changes only together with the frame), so the
+    /// sheep's place is read right even while a direction change waits on the page.
+    private var frameRight = false, frameDown = false
     /// Bumped on every hover layout or drag; a step that comes back from the page after that is dropped.
     private var layoutToken = 0
     private var recheck: Timer?
@@ -183,6 +186,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         hovering = false
         layoutToken += 1
         panel.setFrame(sheep, display: true)
+        frameRight = false; frameDown = false
         bubbleRight = false; bubbleDown = false
         reveal(false) { [weak self] in self?.direction() }
     }
@@ -200,6 +204,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
             reveal(false) { [weak self] in
                 guard let self, self.layoutToken == token else { return }
                 if self.panel.frame != sheep { self.panel.setFrame(sheep, display: true) }
+                self.frameRight = false; self.frameDown = false
                 self.bubbleRight = false; self.bubbleDown = false
                 self.direction()
             }
@@ -215,6 +220,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         let grow = { [weak self] in
             guard let self, self.layoutToken == token, self.hovering else { return }
             if self.panel.frame != open.frame { self.panel.setFrame(open.frame, display: true) }
+            self.frameRight = open.bubbleRight; self.frameDown = open.down
             self.reveal(true)
         }
         if turned { direction(then: grow) } else { grow() }
@@ -234,8 +240,8 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
     /// The sheep's own place: the right end of the window (left while the panel opens right), at its bottom (top while
     /// the panel opens down).
     private func sheepOrigin() -> NSPoint {
-        NSPoint(x: bubbleRight ? panel.frame.minX : panel.frame.maxX - CompanionLayout.side,
-                y: bubbleDown ? panel.frame.maxY - CompanionLayout.side : panel.frame.minY)
+        NSPoint(x: frameRight ? panel.frame.minX : panel.frame.maxX - CompanionLayout.side,
+                y: frameDown ? panel.frame.maxY - CompanionLayout.side : panel.frame.minY)
     }
 
     private func savePlace() {
@@ -245,8 +251,8 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
 
     private func keepOnScreen() {
         let origin = CompanionLayout.origin(saved: sheepOrigin(), screens: Self.screens())
-        panel.setFrameOrigin(NSPoint(x: bubbleRight ? origin.x : origin.x + CompanionLayout.side - panel.frame.width,
-                                     y: bubbleDown ? origin.y + CompanionLayout.side - panel.frame.height : origin.y))
+        panel.setFrameOrigin(NSPoint(x: frameRight ? origin.x : origin.x + CompanionLayout.side - panel.frame.width,
+                                     y: frameDown ? origin.y + CompanionLayout.side - panel.frame.height : origin.y))
     }
 
     private func showMenu(_ event: NSEvent) {
