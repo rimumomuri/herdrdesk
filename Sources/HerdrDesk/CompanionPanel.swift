@@ -13,26 +13,39 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
 
     /// Takes every mouse event over the page: drag to move, click to open, right-click for the menu, hover for the bubble.
     private final class Surface: NSView {
-        var onClick: (() -> Void)?, onMenu: ((NSEvent) -> Void)?, onHover: ((Bool) -> Void)?, onMoved: (() -> Void)?
-        private var start: NSPoint?, startOrigin: NSPoint?, dragged = false
+        var onClick: (() -> Void)?, onMenu: ((NSEvent) -> Void)?, onHover: ((Bool) -> Void)?, onMoved: (() -> Void)?, onDragStart: (() -> Void)?
+        private var drag = CompanionDrag()
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
         override func updateTrackingAreas() {
             super.updateTrackingAreas()
             trackingAreas.forEach(removeTrackingArea)
             addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
         }
-        override func mouseEntered(with event: NSEvent) { onHover?(true) }
-        override func mouseExited(with event: NSEvent) { onHover?(false) }
-        override func mouseDown(with event: NSEvent) { start = NSEvent.mouseLocation; startOrigin = window?.frame.origin; dragged = false }
+        override func mouseEntered(with event: NSEvent) { if drag.acceptsHover { onHover?(true) } }
+        override func mouseExited(with event: NSEvent) { if drag.acceptsHover { onHover?(false) } }
+        override func mouseDown(with event: NSEvent) { drag.press(at: NSEvent.mouseLocation, origin: window?.frame.origin ?? .zero) }
         override func mouseDragged(with event: NSEvent) {
-            guard let start, let startOrigin, let window else { return }
-            let now = NSEvent.mouseLocation, dx = now.x - start.x, dy = now.y - start.y
-            if hypot(dx, dy) > 3 { dragged = true }
-            if dragged { window.setFrameOrigin(NSPoint(x: startOrigin.x + dx, y: startOrigin.y + dy)) }
+            guard let window else { return }
+            let now = NSEvent.mouseLocation
+            var step = drag.move(to: now)
+            if step.began {
+                // close the bubble once; the window has not moved yet, so its new origin is where it stood at the press
+                // (at its new size) and the pointer's whole movement since then still applies
+                onDragStart?()
+                drag.rebase(origin: window.frame.origin)
+                step = drag.move(to: now)
+            }
+            if let origin = step.origin { window.setFrameOrigin(origin) }
         }
         override func mouseUp(with event: NSEvent) {
-            if dragged { onMoved?() } else if start != nil { onClick?() }
-            start = nil
+            switch drag.release() {
+            case .moved:
+                onMoved?()
+                // the pointer may rest on the sheep again: show its bubble then, not during the drag
+                if let window { onHover?(window.frame.contains(NSEvent.mouseLocation)) }
+            case .click: onClick?()
+            case .none: break
+            }
         }
         override func rightMouseDown(with event: NSEvent) { onMenu?(event) }
     }
@@ -85,6 +98,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         surface.onClick = { [weak self] in self?.onOpen?() }
         surface.onHover = { [weak self] in self?.setHover($0) }
         surface.onMoved = { [weak self] in self?.savePlace() }
+        surface.onDragStart = { [weak self] in self?.setHover(false) }
         surface.onMenu = { [weak self] in self?.showMenu($0) }
         let saved = defaults.string(forKey: "companionOrigin").map(NSPointFromString)
         panel.setFrameOrigin(CompanionLayout.origin(saved: saved, screens: Self.screens()))

@@ -58,3 +58,40 @@ public enum CompanionLayout {
         return face
     }
 }
+
+/// Mouse handling of the floating sheep: a press that moves more than a few points is a drag, otherwise a click.
+/// While the button is down, hover changes are ignored: the window trails the pointer, so the pointer slips in and out
+/// of it, and opening and closing the bubble on each slip made the window flicker.
+public struct CompanionDrag {
+    public enum Outcome: Equatable { case click, moved, none }
+    private var start: CGPoint?, startOrigin: CGPoint?, dragging = false
+    public init() {}
+
+    public var acceptsHover: Bool { start == nil }
+
+    public mutating func press(at point: CGPoint, origin: CGPoint) {
+        start = point; startOrigin = origin; dragging = false
+    }
+
+    /// `began` is true once, when the press turns into a drag; `origin` is where the window goes (nil: stay).
+    public mutating func move(to point: CGPoint) -> (began: Bool, origin: CGPoint?) {
+        guard let start, let startOrigin else { return (false, nil) }
+        let dx = point.x - start.x, dy = point.y - start.y
+        var began = false
+        if !dragging, hypot(dx, dy) > 3 { dragging = true; began = true }
+        return (began, dragging ? CGPoint(x: startOrigin.x + dx, y: startOrigin.y + dy) : nil)
+    }
+
+    /// The window changed size when the drag began (the window's origin at the press, seen at its new size):
+    /// the pointer's whole movement since the press still applies.
+    public mutating func rebase(origin: CGPoint) {
+        guard start != nil else { return }
+        startOrigin = origin
+    }
+
+    public mutating func release() -> Outcome {
+        defer { start = nil; startOrigin = nil; dragging = false }
+        guard start != nil else { return .none }
+        return dragging ? .moved : .click
+    }
+}

@@ -71,3 +71,10 @@ export function waitingInboxMarkup(items,copy,connected=true,now=Date.now()) {
       +'<button type="button" data-inbox-key="'+escapeInbox(item.key)+'" data-inbox-binding="'+escapeInbox(item.binding)+'"'+(connected&&item.target?'':' disabled')+'>'+escapeInbox(copy(item.target?'waitingOpen':'waitingTargetUnknown'))+'</button></article>';
   }).join('');
 }
+
+/** Items not already shown as a card in the open conversation, so each waits in one place. `shown`: the question ids
+ *  and the blocked members' addresses that the conversation's cards show right now. */
+export function notShownInChat(items, shown) {
+  return items.filter(item => item.kind === 'question' ? !shown.questions.has(item.requestId)
+    : !(item.kind === 'blocked' && shown.blocked.has(item.actor?.address)));
+}
