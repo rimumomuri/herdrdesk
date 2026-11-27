@@ -73,6 +73,8 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
     private var hovering = false
     private var bubbleRight = false
     private var bubbleDown = false
+    /// Bumped on every hover layout or drag; a step that comes back from the page after that is dropped.
+    private var layoutToken = 0
     private var recheck: Timer?
     private var observers: [NSObjectProtocol] = []
 
@@ -179,6 +181,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         guard hovering else { return }
         let sheep = NSRect(origin: sheepOrigin(), size: NSSize(width: CompanionLayout.side, height: CompanionLayout.side))
         hovering = false
+        layoutToken += 1
         panel.setFrame(sheep, display: true)
         bubbleRight = false; bubbleDown = false
         reveal(false) { [weak self] in self?.direction() }
@@ -191,9 +194,11 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         let sheep = NSRect(origin: sheepOrigin(), size: NSSize(width: CompanionLayout.side, height: CompanionLayout.side))
         let stats = state?["stats"] as? [[String: Any]] ?? []
         let lines = (state?["lines"] as? [String]) ?? []
+        layoutToken += 1
+        let token = layoutToken
         guard hovering, !stats.isEmpty || !lines.isEmpty else {
             reveal(false) { [weak self] in
-                guard let self else { return }
+                guard let self, self.layoutToken == token else { return }
                 if self.panel.frame != sheep { self.panel.setFrame(sheep, display: true) }
                 self.bubbleRight = false; self.bubbleDown = false
                 self.direction()
@@ -208,7 +213,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         let turned = open.bubbleRight != bubbleRight || open.down != bubbleDown
         bubbleRight = open.bubbleRight; bubbleDown = open.down
         let grow = { [weak self] in
-            guard let self else { return }
+            guard let self, self.layoutToken == token, self.hovering else { return }
             if self.panel.frame != open.frame { self.panel.setFrame(open.frame, display: true) }
             self.reveal(true)
         }
