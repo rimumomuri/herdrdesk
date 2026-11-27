@@ -3,7 +3,7 @@
 @font-face { font-family:HerdrHangulCell; src:local("Apple SD Gothic Neo"), local("AppleSDGothicNeo-Regular");
   unicode-range:U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7AF, U+D7B0-D7FF; size-adjust:118% }
 :root{color-scheme:dark;--bg:#101012;--panel:#19191c;--card:#242427;--line:#38383e;--ink:#f4f4f6;--muted:#acacb6;--warn:#dbc39e;--good:#dcdce5}
-.waiting-inbox{position:fixed;top:44px;left:50%;transform:translateX(-50%);width:min(820px,calc(100vw - 24px));z-index:30;box-shadow:0 14px 36px rgba(0,0,0,.5);margin:0;border:1px solid #51493c;border-radius:9px;background:var(--panel);max-height:30dvh;overflow:auto}
+.waiting-inbox{position:fixed;top:44px;left:50%;transform:translateX(-50%);width:min(820px,calc(100vw - 24px));z-index:5;box-shadow:0 14px 36px rgba(0,0,0,.5);margin:0;border:1px solid #51493c;border-radius:9px;background:var(--panel);max-height:30dvh;overflow:auto}
 .waiting-inbox>header{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
 .waiting-inbox h2{font-size:12px;color:var(--warn)}.waiting-inbox header span{font-size:11px;color:var(--muted)}
 .waiting-row{display:grid;grid-template-columns:minmax(140px,.7fr) minmax(0,2fr) auto;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--line)}
