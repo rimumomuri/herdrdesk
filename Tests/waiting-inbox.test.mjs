@@ -72,11 +72,13 @@ test('I04 registered origin and deep linked target have separate visible identit
   assert.equal((unknown.match(/data-waiting-identity/g)||[]).length,1);
 });
 
-test('a waiting item already shown in the open conversation is left out of the top list', async () => {
+test('only the waiting items the open conversation actually shows as cards leave the top list', async () => {
   const {notShownInChat} = await import('../Resources/web/waiting-inbox.js');
-  const items = [{key: 'a', actor: {address: 't1'}, target: {address: 't1'}}, {key: 'b', actor: {address: 't9'}, target: {address: 't2'}},
-    {key: 'c', actor: {address: 't7'}, target: null}];
-  assert.deepEqual(notShownInChat(items, new Set(['t1'])).map(i => i.key), ['b', 'c']);
-  assert.deepEqual(notShownInChat(items, new Set(['t2'])).map(i => i.key), ['a', 'c']);
-  assert.deepEqual(notShownInChat(items, new Set()).map(i => i.key), ['a', 'b', 'c']);
+  const items = [{key: 'ask:q1:s', kind: 'question', requestId: 'q1', actor: {address: 't1'}},
+    {key: 'blocked:t2:s', kind: 'blocked', actor: {address: 't2'}},
+    {key: 'blocked:t3:s', kind: 'blocked', actor: {address: 't3'}}];
+  assert.deepEqual(notShownInChat(items, {questions: new Set(['q1']), blocked: new Set()}).map(i => i.key), ['blocked:t2:s', 'blocked:t3:s']);
+  // a team room shows one blocked member: the other stays in the top list
+  assert.deepEqual(notShownInChat(items, {questions: new Set(), blocked: new Set(['t2'])}).map(i => i.key), ['ask:q1:s', 'blocked:t3:s']);
+  assert.equal(notShownInChat(items, {questions: new Set(), blocked: new Set()}).length, 3);
 });

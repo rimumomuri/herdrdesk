@@ -72,7 +72,9 @@ export function waitingInboxMarkup(items,copy,connected=true,now=Date.now()) {
   }).join('');
 }
 
-/** Items not already shown as a card in the open conversation (`addresses`: the people in it), so each waits in one place. */
-export function notShownInChat(items, addresses) {
-  return items.filter(item => !addresses.has(item.actor?.address) && !addresses.has(item.target?.address));
+/** Items not already shown as a card in the open conversation, so each waits in one place. `shown`: the question ids
+ *  and the blocked members' addresses that the conversation's cards show right now. */
+export function notShownInChat(items, shown) {
+  return items.filter(item => item.kind === 'question' ? !shown.questions.has(item.requestId)
+    : !(item.kind === 'blocked' && shown.blocked.has(item.actor?.address)));
 }
