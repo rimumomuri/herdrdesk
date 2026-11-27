@@ -231,7 +231,7 @@ computers:['Computers','컴퓨터','コンピューター'],computerMain:['main'
  openApprovalHere:['Open linked target','연결된 대상 열기','リンク先を開く'],
  openApproval:['Open linked target','연결된 대상 열기','リンク先を開く'],
  noQuestions:['No registered questions.','등록된 질문이 없습니다.','登録された質問はありません。'],
- answerNeeded:['Answer needed','답변 필요','回答が必要'],
+ answerNeeded:['Answer needed','답변 필요','回答が必要'],approvalWaitingTitle:['Waiting on you','답변 대기','回答待ち'],approvalHide:['Hide','숨기기','隠す'],approvalShow:['Show again','다시 보기','再表示'],
  approvalUnavailable:['Linked target unavailable','연결된 대상 확인 필요','リンク先を確認してください'],
  answer:['Send answer','답변 보내기','回答を送信'],
  answerHint:['Write an answer…','답변을 작성하세요…','回答を入力…'],

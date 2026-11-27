@@ -18,7 +18,7 @@ import { companionState, companionSummary, featuredAgent } from './companion.js'
 import { agentTrouble, machineTrouble } from './trouble.js';
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest, mainMachineLabel } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText, boardSummaryHTML, BOARD_LABELS } from './task-board.js';
-import { questionFormHTML, questionFilesHTML, keepTyping } from './chat-questions.js';
+import { questionFormHTML, questionFilesHTML, keepTyping, approvalSignature, approvalDock, approvalHeadHTML, keepHidden, headerState, APPROVAL_FOCUS } from './chat-questions.js';
 import { attentionOf, autoUnread, markSeen, snoozeActive, snoozeUntil, nextUrgent, waitingCount } from './triage.js';
 import { filterPalette, paletteHTML } from './palette.js';
 import { sendBlocked, deferredSaver } from './composer.js';
@@ -277,6 +277,8 @@ function replacePreferences(next){
 }
 let terminalOpen=false, approvalTarget=null, pendingApproval=null;
 let roomID=null, memberTeam=null, roomStarted=false, arrivalID=null;
+// The waiting popup the person hid (its signature): it stays hidden until something new waits.
+let approvalHidden=null, approvalCurrent='';
 const historyHandoffs=new Map(load('team.handoffs.v1',[]).map(row=>[row.id,row]));
 const timelineIds=new Set(), routePulses=new Map();
 const openProgress=new Set();
@@ -1611,20 +1613,38 @@ function renderChatContext(term,room) {
   const people=snapshot.connection==='live'?[term,...(room?.members||[])]:[];
   const troubled=people.find(member=>agentTrouble(member)==='login')||(!waiting&&people.find(member=>agentTrouble(member)==='limit'))||null;
   const approval=$('#inlineApproval');
-  approval.hidden=!request&&!waiting&&!troubled || page!=='conversations';
+  const troubleKind=troubled?agentTrouble(troubled):'';
+  approvalCurrent=page==='conversations'?approvalSignature({requests,troubled:troubled&&sessionKey(troubled),kind:troubleKind,waiting:waiting&&sessionKey(waiting)}):'';
+  approvalHidden=keepHidden(approvalCurrent,approvalHidden);
+  // The header's color says where the conversation stands: orange while it waits on you, green while it works.
+  const chatState=page==='conversations'?headerState({waiting:Boolean(approvalCurrent),
+    working:[term,...(room?.members||[])].some(member=>member?.state==='live'&&busyNow(member))}):'';
+  document.querySelector('main').dataset.chatState=chatState;
+  const chip=$('#chatStateChip');
+  chip.hidden=!chatState;
+  const chipText=chatState?copy(chatState==='answer'?'approvalWaitingTitle':'working'):'';
+  if(chip.textContent!==chipText)chip.textContent=chipText;
+  chip.dataset.state=chatState;
+  const dock=approvalDock(approvalCurrent,approvalHidden);
+  approval.hidden=!dock.popup;
+  const pill=$('#approvalPill');
+  pill.hidden=!dock.pill;
+  const pillText=copy('approvalWaitingTitle')+' '+Math.max(1,requests.length)+' · '+copy('approvalShow');
+  if(pill.textContent!==pillText)pill.textContent=pillText;
+  const head=approvalHeadHTML(Math.max(1,requests.length),copy);
   const typing=approval.contains(document.activeElement)&&document.activeElement.matches('textarea')
     &&keepTyping(requests,document.activeElement.closest('[data-question]')?.dataset.question,snapshot.connection==='live',questionSending);
   if(request){
-    if(!typing&&setPanel('#inlineApproval','<div class="chat-questions">'+requests.map(questionHTML).join('')+'</div>'))
+    if(!typing&&setPanel('#inlineApproval',head+'<div class="chat-questions">'+requests.map(questionHTML).join('')+'</div>'))
       enterFresh(approval,'questions','data-question',POP,160);
   }else if(troubled){
     // a login or usage limit: say what the person can do, and offer the terminal where it is shown
-    const kind=agentTrouble(troubled);
-    setPanel('#inlineApproval','<div class="chat-approval chat-trouble" data-trouble="'+kind+'">'+(kind==='login'?KEY:HOURGLASS)
+    const kind=troubleKind;
+    setPanel('#inlineApproval',head+'<div class="chat-approval chat-trouble" data-trouble="'+kind+'">'+(kind==='login'?KEY:HOURGLASS)
       +'<span><strong>'+escape(copy('trouble_'+kind)+' · '+troubled.label)+'</strong><p>'+escape(copy('troubleHint_'+kind))+'</p></span>'
       +'<button type="button" data-waiting-terminal="'+escape(sessionKey(troubled))+'">'+copy('terminal')+'</button></div>');
   }else if(waiting){
-    setPanel('#inlineApproval','<div class="chat-approval"><strong>'+escape(copy('due')+' · '+waiting.label)
+    setPanel('#inlineApproval',head+'<div class="chat-approval"><strong>'+escape(copy('due')+' · '+waiting.label)
       +'</strong><button type="button" data-waiting-terminal="'+escape(sessionKey(waiting))+'">'+copy('terminal')+'</button></div>');
   }
   roomCurrentKey=currentKey;
@@ -1717,6 +1737,10 @@ function detail() {
 }
 
 let waitingExpiryTimer;
+// The top waiting list the person hid (its items): it stays hidden until the list changes.
+let waitingHidden=null, waitingCurrent='';
+$('#waitingInboxHide').addEventListener('click',()=>{waitingHidden=waitingCurrent;$('#waitingInbox').hidden=true;$('#waitingInboxPill').hidden=!waitingCurrent;});
+$('#waitingInboxPill').addEventListener('click',()=>{waitingHidden=null;$('#waitingInboxPill').hidden=true;$('#waitingInbox').hidden=!waitingCurrent;});
 function renderWaitingInbox(){
   clearTimeout(waitingExpiryTimer);
   const now=Date.now(),expiry=[...inventory.map(term=>Date.parse(term.labels?.['ask.expires'])),
@@ -1725,7 +1749,14 @@ function renderWaitingInbox(){
   const messages=[...Object.values(legacyMessages).flat(),...deliveries];
   const linked=new Set(linkedWaiting(snapshot.lineage,inventory,snapshot.ledger||{}).filter(({root})=>messages.some(message=>message.id===root.originRequestId&&message.conversationId===root.conversationId)).map(item=>item.row.key));
   const items=waitingInboxItems(inventory,snapshot.ledger||{}).filter(item=>!linked.has(item.key));
-  const panel=$('#waitingInbox');panel.hidden=!items.length;
+  const panel=$('#waitingInbox');
+  waitingCurrent=items.map(item=>item.key+'@'+item.binding).join('|');
+  waitingHidden=keepHidden(waitingCurrent,waitingHidden);
+  const dock=approvalDock(waitingCurrent,waitingHidden);
+  panel.hidden=!dock.popup;
+  const pill=$('#waitingInboxPill');pill.hidden=!dock.pill;
+  const pillText=copy('approvalWaitingTitle')+' '+items.length+' · '+copy('approvalShow');
+  if(pill.textContent!==pillText)pill.textContent=pillText;
   $('#waitingInboxCount').textContent=copy('waitingRegistered')+' '+items.filter(item=>item.kind==='question').length+' · '+copy('waitingUnknown')+' '+items.filter(item=>item.kind==='blocked').length;
   const focused=document.activeElement?.dataset.inboxKey;
   const changed=setPanel('#waitingInboxList',waitingInboxMarkup(items,copy,snapshot.connection==='live'));
@@ -2498,13 +2529,14 @@ $('#roomBack').addEventListener('click',()=>{if(memberTeam)openRoom(memberTeam);
 
 
 function revealQuestions() {
+  approvalHidden=null;   // asked to see what waits: a hidden popup comes back
   if(page==='structure'){
     directoryOpen=true;
     $('.side').hidden=false;
   }
   if(selectedTab==='questions')selectedTab=currentRoom()?'team':'chat';
   detail();
-  $('#inlineApproval').querySelector('textarea,button:not(:disabled)')?.focus();
+  $('#inlineApproval').querySelector(APPROVAL_FOCUS)?.focus();
 }
 $('#inlineHandoff').addEventListener('click',()=>{
   selectedTab='team';
@@ -2537,6 +2569,9 @@ function checkApprovalTarget(id){
 $('#terminalToggle').addEventListener('click',()=>{ if(terminalOpen)closeTerminalDrawer();else openTerminalDrawer(); });
 $('#terminalClose').addEventListener('click',closeTerminalDrawer);
 $('#inlineApproval').addEventListener('click',event=>{
+  if(event.target.closest('[data-approval-hide]')){
+    approvalHidden=approvalCurrent;$('#inlineApproval').hidden=true;$('#approvalPill').hidden=!approvalCurrent;return;
+  }
   const waiting=event.target.closest('[data-waiting-terminal]')?.dataset.waitingTerminal;
   if(waiting){
     const target=inventory.find(term=>sessionKey(term)===waiting);
@@ -2556,6 +2591,11 @@ $('#arrivalOpen').addEventListener('click',()=>{
   $('#arrival').hidden=true;
   if(item?.approval?.address && snapshot.connection==='live')checkApprovalTarget(item.id);
   else revealQuestions();
+});
+$('#approvalPill').addEventListener('click',()=>{
+  approvalHidden=null;$('#approvalPill').hidden=true;
+  const panel=$('#inlineApproval');panel.hidden=!approvalCurrent;
+  panel.querySelector(APPROVAL_FOCUS)?.focus();
 });
 $('#arrivalDismiss').addEventListener('click',()=>{arrivalID=null;$('#arrival').hidden=true;});
 $('#lanes').addEventListener('click',event=>{

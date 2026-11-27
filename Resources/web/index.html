@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<header class="top"><span id="connection" role="status"></span><button type="button" id="alertCount" hidden></button><details class="settings"><summary data-copy="settings"></summary><div class="settings-menu">
+<header class="top"><span id="connection" role="status"></span><button type="button" id="alertCount" hidden></button><button type="button" id="waitingInboxPill" hidden></button><details class="settings"><summary data-copy="settings"></summary><div class="settings-menu">
  <div class="extra-views"><button data-view="conversations" data-copy="conversations" hidden></button><button data-view="structure" data-copy="viewStructure"></button></div>
  <label for="language" data-copy="language">Language</label><select id="language"><option value="en">English</option><option value="ko">한국어</option><option value="ja">日本語</option></select>
  <label class="sound-toggle"><input id="automaticChat" type="checkbox" checked><span data-copy="automaticChat"></span></label>
@@ -24,7 +24,7 @@
  </div>
  <div class="controls"><button data-action="configure" data-copy="chooseCore"></button><button data-action="refresh" data-copy="refresh"></button></div>
  </div></details></header>
-<section id="waitingInbox" class="waiting-inbox" aria-labelledby="waitingInboxTitle" hidden><header><h2 id="waitingInboxTitle" data-copy="waitingInbox"></h2><span id="waitingInboxCount" role="status"></span></header><div id="waitingInboxList"></div></section>
+<section id="waitingInbox" class="waiting-inbox" aria-labelledby="waitingInboxTitle" hidden><header><h2 id="waitingInboxTitle" data-copy="waitingInbox"></h2><span id="waitingInboxCount" role="status"></span><button type="button" id="waitingInboxHide" data-copy="approvalHide"></button></header><div id="waitingInboxList"></div></section>
 <main data-page="conversations">
  <div id="arrival" class="arrival" hidden><span id="arrivalSheep" aria-hidden="true"></span><div><strong id="arrivalTitle" role="status"></strong><span id="arrivalFrom"></span></div><button type="button" id="arrivalOpen"></button><button type="button" id="arrivalDismiss" aria-label="Close">×</button></div>
  <header class="heading"><h1 data-copy="overview"></h1></header>
@@ -53,7 +53,7 @@
   <div class="stack side">
   <section class="panel detail">
    <header><h2 data-copy="selection"></h2><div class="org-tools"><span id="sessionState"></span><button type="button" id="directoryClose" hidden>×</button></div></header>
-   <div class="content"><div class="identity"><span class="avatar" id="targetAvatar" aria-hidden="true">·</span><button class="character-avatar-button" id="characterEdit" type="button" aria-haspopup="dialog" hidden></button><div><h3 id="targetTitle"></h3><p class="target-path" id="targetPath"></p><p class="target-path" id="launchModel"></p></div><div class="room-tools" id="roomTools" hidden><button id="terminalToggle" type="button" data-copy="terminal" aria-controls="terminal" aria-expanded="false"></button><button id="roomMembersToggle" type="button" aria-controls="groupMembers" aria-expanded="false" hidden></button><button id="roomBack" type="button" data-copy="backToGroup" hidden></button></div></div>
+   <div class="content"><div class="identity"><span class="avatar" id="targetAvatar" aria-hidden="true">·</span><button class="character-avatar-button" id="characterEdit" type="button" aria-haspopup="dialog" hidden></button><div><h3 id="targetTitle"></h3><span id="chatStateChip" class="chat-state-chip" hidden></span><p class="target-path" id="targetPath"></p><p class="target-path" id="launchModel"></p></div><div class="room-tools" id="roomTools" hidden><button id="terminalToggle" type="button" data-copy="terminal" aria-controls="terminal" aria-expanded="false"></button><button id="roomMembersToggle" type="button" aria-controls="groupMembers" aria-expanded="false" hidden></button><button id="roomBack" type="button" data-copy="backToGroup" hidden></button></div></div>
     <aside id="groupMembers" class="group-members" hidden aria-label="Members"></aside>
     <nav id="tabs"><button type="button" data-tab="chat" data-copy="chat"></button><button type="button" data-tab="team" data-copy="teamActivity" hidden></button><button type="button" data-tab="terminal" data-copy="terminal"></button><button type="button" data-tab="activity" data-copy="activity"></button><button type="button" data-tab="questions" hidden></button></nav>
     <div id="chat"><details id="chatHistory" tabindex="0" hidden><summary id="historyLabel"></summary><div id="chatTranscript"><div id="chatLog" aria-live="polite"></div>
@@ -63,7 +63,8 @@
       </div>
       </div></details>
      <button type="button" id="chatToBottom" class="to-bottom" hidden></button>
-     <div id="inlineApproval" hidden></div>
+     <div id="inlineApproval" role="dialog" aria-live="polite" hidden></div>
+     <button type="button" id="approvalPill" hidden></button>
      <div id="taskBoard" class="task-board" hidden></div>
      <div id="roomFeed" hidden tabindex="0"></div>
      <button type="button" id="feedToBottom" class="to-bottom" hidden></button>

@@ -39,3 +39,31 @@ export function questionFormHTML(q, view, copy, escape) {
 export function keepTyping(requests, focusedId, live, sending) {
   return live && !sending.has(focusedId) && requests.some(q => q.id === focusedId && q.answerable);
 }
+
+/** What the waiting popup is about, as a key: a hidden popup stays hidden only while this stays the same. */
+export function approvalSignature({ requests = [], troubled = null, kind = '', waiting = null } = {}) {
+  if (requests.length) return 'q:' + requests.map(q => q.id).join(',');
+  if (troubled) return 'trouble:' + kind + ':' + troubled;
+  if (waiting) return 'waiting:' + waiting;
+  return '';
+}
+
+/** The popup shows while something waits, unless the person hid this same item; hidden, a pill brings it back. */
+export function approvalDock(signature, hidden) {
+  if (!signature) return { popup: false, pill: false };
+  return hidden === signature ? { popup: false, pill: true } : { popup: true, pill: false };
+}
+
+export function approvalHeadHTML(count, copy) {
+  return '<div class="approval-head"><span>' + copy('approvalWaitingTitle') + ' <b class="approval-count">' + count + '</b></span>'
+    + '<button type="button" data-approval-hide>' + copy('approvalHide') + '</button></div>';
+}
+
+/** A hidden popup's mark is dropped as soon as something else (or nothing) waits, so a later wait shows again. */
+export const keepHidden = (signature, hidden) => hidden && hidden === signature ? hidden : null;
+
+/** The conversation header's state color: something waiting on the person first, then work in progress, else none. */
+export const headerState = ({ waiting = false, working = false } = {}) => waiting ? 'answer' : working ? 'working' : '';
+
+/** What to focus when a waiting item is opened: its answer box or action, never the hide button. */
+export const APPROVAL_FOCUS = 'textarea,button:not([data-approval-hide]):not(:disabled)';
