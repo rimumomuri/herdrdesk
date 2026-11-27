@@ -144,6 +144,12 @@ public enum Recovery {
             candidates = [same]
         }
         if candidates.isEmpty { candidates = matches }
+        // Nothing claims it by label or session: the terminal at its saved address still counts when it is an agent that
+        // could not be verified (never start a second copy) or an unlabelled shell left behind.
+        if candidates.isEmpty, let same = runtime.terminal(role.lastAddress), same.machine == role.machine,
+           (same.agent != nil && same.sessionId == nil) || (same.shell && same.labels[label] == nil) {
+            candidates = [same]
+        }
         return (candidates.first, true)
     }
 
@@ -178,6 +184,7 @@ public enum Recovery {
         var byKey: [String: [ObservedTerminal]] = [:]
         for terminal in observed { byKey[key(for: terminal), default: []].append(terminal) }
         var roles: [RecoveryRole] = []
+        var fresh = Set<String>()        // keys taken from what runs now
         // What was seen on a machine that is not connected now no longer counts: it may come back rebooted.
         var seenNow = seen.filter { key in registry.roles.first { $0.key == key }.map { runtime.online($0.machine) } ?? true }
         var handled = Set<String>()
@@ -188,6 +195,7 @@ public enum Recovery {
                 var updated = role(for: found[0], key: old.key, among: runtime.terminals, now: now)
                 if updated.sameSave(as: old) { updated.savedAt = old.savedAt }
                 roles.append(updated)
+                fresh.insert(old.key)
                 seenNow.insert(old.key)
             } else if !runtime.online(old.machine) || !seenNow.contains(old.key) {
                 roles.append(old)
@@ -203,11 +211,15 @@ public enum Recovery {
         }
         for (key, found) in byKey.sorted(by: { $0.key < $1.key }) where !handled.contains(key) && found.count == 1 {
             roles.append(role(for: found[0], key: key, among: runtime.terminals, now: now))
+            fresh.insert(key)
             seenNow.insert(key)
         }
-        // Two keys for one conversation: keep the first.
+        // Two keys for one conversation: what runs now wins over an older entry (a renamed role), else the first.
         var sessions = Set<String>()
-        roles = roles.filter { sessions.insert(($0.machine ?? "") + "|" + $0.sessionId).inserted }
+        let current = roles.filter { fresh.contains($0.key) && sessions.insert(($0.machine ?? "") + "|" + $0.sessionId).inserted }
+        let older = roles.filter { !fresh.contains($0.key) && sessions.insert(($0.machine ?? "") + "|" + $0.sessionId).inserted }
+        let keep = Set((current + older).map(\.key))
+        roles = roles.filter { keep.contains($0.key) }
         var result = RecoveryRegistry(roles: roles, savedAt: registry.savedAt)
         if result.roles != registry.roles { result.savedAt = now }
         return (result, seenNow)

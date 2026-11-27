@@ -78,11 +78,8 @@ public struct RecoveryRunner {
                 let (action, reason) = Recovery.choose(role, actual, online: online)
                 if action == .skip { plan[index].action = .skip; plan[index].reason = reason; plan[index].terminal = actual?.address; continue }
                 guard action == plan[index].action else { throw RecoveryError("its state changed before the start: \(reason)") }
-                let parents = role.parentRole.map { parentKey in
-                    runtime.terminals.filter { $0.labels[Recovery.label] == parentKey && $0.agent != nil && $0.machine == role.machine }
-                } ?? []
-                if parents.count > 1 { throw RecoveryError("its lead is open more than once") }
-                let args = try Recovery.runArguments(role, runtime: runtime, parent: parents.first?.address, locale: locale, now: now())
+                let parent = Self.parentAddress(for: role.parentRole, in: registry, runtime: runtime)
+                let args = try Recovery.runArguments(role, runtime: runtime, parent: parent, locale: locale, now: now())
                 let result = hc.run(args, timeout: 60)
                 guard result.code == 0, !result.timedOut, let data = result.out.data(using: .utf8),
                       let started = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
@@ -107,6 +104,14 @@ public struct RecoveryRunner {
             }
         }
         return RecoveryReport(at: now(), applied: true, roles: final, ready: final.allSatisfy { $0.action == .skip }, retired: retired)
+    }
+
+    /// Where a role's saved lead runs now: found through its own saved session, so an unlabelled lead is found too.
+    public static func parentAddress(for key: String?, in registry: RecoveryRegistry, runtime: RecoveryRuntime) -> String? {
+        guard let key, let parent = registry.roles.first(where: { $0.key == key }),
+              let (actual, online) = try? Recovery.resolve(parent, in: runtime), let actual,
+              Recovery.choose(parent, actual, online: online).0 == .skip else { return nil }
+        return actual.address
     }
 
     /// Once a role runs again, the shell it left behind gives up its role labels. The shell and its input stay.

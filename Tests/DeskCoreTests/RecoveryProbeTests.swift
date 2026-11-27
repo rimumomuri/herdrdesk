@@ -152,4 +152,13 @@ final class RecoveryProbeTests: XCTestCase {
         let runtime = try RecoveryCollector(hc: core, app: nil).collect()
         XCTAssertTrue(Recovery.bypass(runtime.terminal("t9")?.argv ?? []))
     }
+
+    func testAParentStillRunningIsFoundByItsSession() throws {
+        let parentSid = "22222222-2222-3333-4444-555555555555"
+        let parent = RecoveryRole(key: "local:\(parentSid)", title: "Lead", machine: nil, agent: "codex", sessionId: parentSid, sessionFile: "/p",
+                                  cwd: "/Users/me", name: nil, labels: [:], parentRole: nil, lastAddress: "t7", location: nil, bypass: false, savedAt: "")
+        let runtime = RecoveryRuntime(terminals: [ObservedTerminal(address: "t7", agent: "codex", sessionId: parentSid)])
+        XCTAssertEqual(RecoveryRunner.parentAddress(for: "local:\(parentSid)", in: RecoveryRegistry(roles: [parent]), runtime: runtime), "t7")
+        XCTAssertNil(RecoveryRunner.parentAddress(for: nil, in: RecoveryRegistry(roles: [parent]), runtime: runtime))
+    }
 }

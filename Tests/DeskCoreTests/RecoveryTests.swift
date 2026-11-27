@@ -259,4 +259,16 @@ final class RecoveryTests: XCTestCase {
         XCTAssertNotEqual(Recovery.labelSignature(["team.id": "a", "x": "1"]), Recovery.labelSignature(["team.id": "b", "x": "1"]))
         XCTAssertEqual(Recovery.labelSignature(["team.id": "a", "x": "1"]), Recovery.labelSignature(["team.id": "a", "x": "2"]))
     }
+
+    func testAnUnverifiedAgentStillAtItsAddressBlocksInsteadOfStartingACopy() {
+        var saved = role(); saved.labels = [:]; saved.key = "local:\(sid)"
+        var running = agentTerm("t1", role: nil); running.sessionId = nil
+        XCTAssertEqual(Recovery.plan(RecoveryRegistry(roles: [saved]), runtime: RecoveryRuntime(terminals: [running]), valid: { _ in nil }).first?.action, .blocked)
+    }
+
+    func testARenamedRoleReplacesItsOldEntry() {
+        let before = RecoveryRegistry(roles: [role("old-name")], savedAt: "t0")
+        let (saved, _) = Recovery.merge(before, runtime: RecoveryRuntime(terminals: [agentTerm("t1", role: "new-name")]), seen: ["old-name"], now: "t2")
+        XCTAssertEqual(saved.roles.map(\.key), ["new-name"])
+    }
 }
