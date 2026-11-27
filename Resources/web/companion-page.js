@@ -43,7 +43,10 @@ window.companion = {
     flash.hidden = !state.flash;
     flash.dataset.kind = state.flash || '';
     flash.innerHTML = state.flash === 'handoff' ? ARROW : state.flash ? CHECK : '';
-    document.getElementById('companionBubble').innerHTML = (state.lines || []).slice(0, 4).map(line => '<div>' + escapeText(line) + '</div>').join('');
+    // the stat panel when there is something to list, else the short lines
+    const stats = state.stats || [];
+    document.getElementById('companionBubble').innerHTML = stats.length ? statPanelHTML(stats)
+      : (state.lines || []).slice(0, 4).map(line => '<div>' + escapeText(line) + '</div>').join('');
     if (state.mood === 'attention') {
       if (moodChanged || state.count > (current?.count || 0)) nudge();
       nudgeTimer ??= setInterval(nudge, NUDGE_EVERY);
@@ -53,5 +56,9 @@ window.companion = {
     }
     current = state;
   },
-  hover(on, right) { root.classList.toggle('hovered', !!on); root.classList.toggle('bubble-right', !!(on && right)); },
+  hover(on, right, down) {
+    root.classList.toggle('hovered', !!on);
+    root.classList.toggle('bubble-right', !!(on && right));
+    root.classList.toggle('bubble-down', !!(on && down));
+  },
 };

@@ -35,3 +35,24 @@ body.companion-body { display:block; min-height:0; min-width:0 }
 @keyframes companion-ring { 0% { outline:2px solid #e5484d; outline-offset:0 } 100% { outline:2px solid #e5484d00; outline-offset:12px } }
 @keyframes companion-pop { from { transform:scale(.85); opacity:0 } to { transform:none; opacity:1 } }
 @media(prefers-reduced-motion:reduce) { .companion, .companion * { animation:none!important; transition:none!important } }
+/* Hover stat panel: who waits on you, who works and for how long, who just finished. The window grows to fit it; the
+   sheep stays where it was, at the bottom (or the top while the panel opens downward). */
+.companion.hovered { align-items:flex-end; padding-bottom:10px }
+.companion.hovered.bubble-down { align-items:flex-start; padding-top:10px; padding-bottom:0 }
+.companion-bubble:has(.stat-panel) { max-width:282px; width:282px; padding:8px 10px; box-sizing:border-box }
+.stat-panel { display:grid; gap:7px }
+.stat-section header { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:.02em; color:#d7d7df; margin-bottom:3px }
+.stat-section header b { margin-left:auto; min-width:18px; padding:0 6px; border-radius:9px; text-align:center; font-size:10.5px; line-height:16px; color:#101012 }
+.stat-dot { width:7px; height:7px; border-radius:50%; flex:none }
+.stat-row { display:flex; align-items:baseline; gap:8px; padding:1px 0 1px 13px; font-size:12px; line-height:17px }
+.stat-row span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#f1f1f5 }
+.stat-row time { flex:none; font-variant-numeric:tabular-nums; font-size:11px; color:#a9a9b4 }
+.stat-more { padding-left:13px; font-size:11px; color:#8c8c96 }
+.stat-section[data-kind=working] .stat-dot, .stat-section[data-kind=working] header b { background:#3ccf7e }
+.stat-section[data-kind=working] .stat-dot { animation:stat-breathe 1.6s ease-in-out infinite }
+.stat-section[data-kind=working] time { color:#7fe3ab }
+.stat-section[data-kind=done] .stat-dot, .stat-section[data-kind=done] header b { background:#6fa8ff }
+.stat-section[data-kind=waiting] .stat-dot, .stat-section[data-kind=waiting] header b { background:#f0a23a }
+.stat-section[data-kind=waiting] .stat-row span { color:#ffd59c }
+@keyframes stat-breathe { 50% { opacity:.35 } }
+@media(prefers-reduced-motion:reduce) { .stat-section[data-kind=working] .stat-dot { animation:none } }

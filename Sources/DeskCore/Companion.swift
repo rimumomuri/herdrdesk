@@ -3,7 +3,7 @@ import Foundation
 /// Rules for the floating companion sheep: when it shows, where it sits, and what reaches its page.
 public enum CompanionLayout {
     public static let side: CGFloat = 84          // the collapsed window: one sheep
-    public static let wide: CGFloat = 300         // while hovered: sheep plus its bubble, growing to the left
+    public static let wide: CGFloat = 380         // while hovered: sheep plus its stat panel, growing to the left
     public static let inset: CGFloat = 24
     public static let idleGrace: TimeInterval = 10
     public static let moods: Set<String> = ["attention", "offline", "limit", "working", "idle"]
@@ -24,12 +24,38 @@ public enum CompanionLayout {
         return CGPoint(x: main.maxX - inset - side, y: main.maxY - inset - side)
     }
 
-    /// The hovered window: sheep plus bubble, growing left, or right when the left would leave the sheep's screen.
-    public static func expanded(sheep: CGRect, screens: [CGRect]) -> (frame: CGRect, bubbleRight: Bool) {
+    /// The hovered window: sheep plus panel, growing left (right when the left would leave the sheep's screen), and,
+    /// when taller than the sheep, up from it (down when up would leave the screen).
+    public static func expanded(sheep: CGRect, screens: [CGRect], height: CGFloat? = nil) -> (frame: CGRect, bubbleRight: Bool, down: Bool) {
         let screen = screens.first { $0.intersects(sheep) } ?? screens.first ?? sheep
-        let left = CGRect(x: sheep.maxX - wide, y: sheep.minY, width: wide, height: sheep.height)
-        if left.minX >= screen.minX { return (left, false) }
-        return (CGRect(x: sheep.minX, y: sheep.minY, width: wide, height: sheep.height), true)
+        let tall = max(height ?? sheep.height, sheep.height)
+        let down = sheep.minY + tall > screen.maxY
+        let y = down ? sheep.maxY - tall : sheep.minY
+        let left = CGRect(x: sheep.maxX - wide, y: y, width: wide, height: tall)
+        if left.minX >= screen.minX { return (left, false, down) }
+        return (CGRect(x: sheep.minX, y: y, width: wide, height: tall), true, down)
+    }
+
+    /// Height of the stat panel for sections holding these many rows (title line, rows, a "more" line, padding).
+    public static func panelHeight(sections: [Int]) -> CGFloat {
+        guard !sections.isEmpty else { return side }
+        let body = sections.reduce(CGFloat(0)) { $0 + 20 + CGFloat(min($1, 5)) * 19 + 6 }
+        return max(side, body + 22)
+    }
+
+    /// The stat panel's sections: known kinds, short titles, a few rows of a name and a short time each.
+    static func stats(_ value: Any?) -> [[String: Any]] {
+        (value as? [Any] ?? []).prefix(3).compactMap { item in
+            guard let section = item as? [String: Any], let kind = section["kind"] as? String,
+                  ["working", "done", "waiting"].contains(kind) else { return nil }
+            let rows: [[String: String]] = (section["rows"] as? [Any] ?? []).prefix(4).compactMap { row in
+                guard let row = row as? [String: Any], let name = row["name"] as? String else { return nil }
+                return ["name": String(name.prefix(60)), "meta": String((row["meta"] as? String ?? "").prefix(24))]
+            }
+            return ["kind": kind, "title": String((section["title"] as? String ?? "").prefix(40)),
+                    "count": min(max(section["count"] as? Int ?? rows.count, 0), 999),
+                    "more": String((section["more"] as? String ?? "").prefix(24)), "rows": rows]
+        }
     }
 
     /// What the page may draw: a known mood, small numbers, a known flash and up to four short lines. Nil for anything else.
@@ -40,7 +66,7 @@ public enum CompanionLayout {
         let lines = (body["lines"] as? [Any] ?? []).compactMap { $0 as? String }.prefix(4).map { String($0.prefix(120)) }
         let flashAt = flash == nil ? nil : body["flashAt"] as? Double
         return ["mood": mood, "count": number("count"), "working": number("working"), "limited": number("limited"), "flash": flash ?? NSNull(),
-                "flashAt": flashAt ?? NSNull(), "lines": Array(lines), "face": face(body["face"]) ?? NSNull()]
+                "flashAt": flashAt ?? NSNull(), "lines": Array(lines), "face": face(body["face"]) ?? NSNull(), "stats": stats(body["stats"])]
     }
 
     /// The agent's look: a known provider and short lowercase style names (the page maps unknown names to defaults).
