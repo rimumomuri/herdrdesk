@@ -168,8 +168,9 @@ public struct RecoveryCollector {
         }
         var connected = Set((json(hc, ["machine", "ls", "--json"])?["machines"] as? [[String: Any]] ?? [])
             .filter { $0["state"] as? String == "connected" }.compactMap { $0["name"] as? String })
-        var spaces = Set<String>(), tabs = Set<String>(), locations: [String: RecoveryLocation] = [:]
+        var spaces = Set<String>(), tabs = Set<String>(), locations: [String: RecoveryLocation] = [:], layoutKnown = false
         if let app, let layout = json(app, ["ls"])?["spaces"] as? [[String: Any]] {
+            layoutKnown = true
             for space in layout {
                 guard let id = space["id"] as? String else { continue }
                 spaces.insert(id)
@@ -237,7 +238,9 @@ public struct RecoveryCollector {
                 terminals.append(term)
             }
         }
-        return RecoveryRuntime(terminals: terminals.sorted { $0.address < $1.address }, connected: connected, spaces: spaces, tabs: tabs)
+        var runtime = RecoveryRuntime(terminals: terminals.sorted { $0.address < $1.address }, connected: connected, spaces: spaces, tabs: tabs)
+        runtime.layoutKnown = layoutKnown
+        return runtime
     }
 
     /// Checks each role's folder and conversation file on its own machine.

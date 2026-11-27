@@ -65,6 +65,8 @@ public struct RecoveryRuntime: Equatable {
     /// Herdr spaces and tabs that exist now (empty when the Herdr app is not installed).
     public var spaces: Set<String>
     public var tabs: Set<String>
+    /// The Herdr app answered, so `spaces` is the real list (possibly empty), not just unknown.
+    public var layoutKnown = false
     public init(terminals: [ObservedTerminal], connected: Set<String> = [], spaces: Set<String> = [], tabs: Set<String> = []) {
         self.terminals = terminals; self.connected = connected; self.spaces = spaces; self.tabs = tabs
     }
@@ -189,7 +191,8 @@ public enum Recovery {
                 seenNow.insert(old.key)
             } else if !runtime.online(old.machine) || !seenNow.contains(old.key) {
                 roles.append(old)
-            } else if runtime.terminals.contains(where: { $0.machine == old.machine && $0.shell && $0.labels[label] == old.key }) {
+            } else if runtime.terminals.contains(where: { $0.machine == old.machine && $0.shell
+                                                         && ($0.labels[label] == old.key || ($0.labels[label] == nil && $0.address == old.lastAddress)) }) {
                 roles.append(old)
             } else if runtime.terminals.contains(where: { $0.machine == old.machine && $0.sessionId == old.sessionId }) {
                 roles.append(old)                                             // still running, only not verifiable now
@@ -234,7 +237,7 @@ public enum Recovery {
                 var (action, reason) = choose(role, actual, online: online)
                 if action == .create || action == .resume {
                     if let problem = valid(role) { (action, reason) = (.blocked, problem) }
-                    else if let location = role.location, !runtime.spaces.isEmpty, !runtime.spaces.contains(location.space) {
+                    else if let location = role.location, runtime.layoutKnown, !runtime.spaces.contains(location.space) {
                         (action, reason) = (.blocked, "its Herdr space is gone; open the space again first")
                     }
                 }
@@ -307,6 +310,12 @@ extension RecoveryRole {
 }
 
 extension Recovery {
+    /// The labels a saved role keeps, as text: a change to them is a reason to save again.
+    public static func labelSignature(_ labels: [String: String]) -> String {
+        labels.filter { $0.key.hasPrefix("team.") || [label, "herdr.space", "herdr.tab", "display.title"].contains($0.key) }
+            .sorted { $0.key < $1.key }.map { $0.key + "=" + $0.value }.joined(separator: ",")
+    }
+
     /// When to save again: soon after the first look of a connection (even with no agent running, so a reboot is noticed),
     /// a few seconds after agents start, end or move, and at most once a minute when only their turns advanced (a new
     /// conversation inside the same agent shows up there). Nil: nothing to do.

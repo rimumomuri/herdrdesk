@@ -75,7 +75,8 @@ final class RecoveryTests: XCTestCase {
 
     func testAGoneHerdrSpaceBlocks() {
         var saved = role(); saved.location = RecoveryLocation(space: "s-old", tab: nil)
-        let plan = Recovery.plan(RecoveryRegistry(roles: [saved]), runtime: RecoveryRuntime(terminals: [shell("t1")], spaces: ["s-new"]), valid: { _ in nil })
+        var runtime = RecoveryRuntime(terminals: [shell("t1")], spaces: ["s-new"]); runtime.layoutKnown = true
+        let plan = Recovery.plan(RecoveryRegistry(roles: [saved]), runtime: runtime, valid: { _ in nil })
         XCTAssertEqual(plan.first?.action, .blocked)
     }
 
@@ -237,5 +238,25 @@ final class RecoveryTests: XCTestCase {
         let b = agentTerm("t2", sid: "01a1cdeb-1111-7390-b24a-dcecf2f47a75", role: nil)
         let (saved, _) = Recovery.merge(RecoveryRegistry(), runtime: RecoveryRuntime(terminals: [a, b]), seen: [], now: "t1")
         XCTAssertEqual(saved.roles.count, 2)
+    }
+
+    func testAnUnlabelledRolesShellAtItsLastAddressKeepsIt() {
+        var saved = role(machine: "laptop"); saved.labels = [:]; saved.key = "laptop:\(sid)"; saved.lastAddress = "laptop/t3"
+        let before = RecoveryRegistry(roles: [saved], savedAt: "t0")
+        let (after, _) = Recovery.merge(before, runtime: RecoveryRuntime(terminals: [shell("laptop/t3", role: nil)], connected: ["laptop"]),
+                                        seen: [saved.key], now: "t2")
+        XCTAssertEqual(after, before)
+    }
+
+    func testASavedSpaceThatIsGoneBlocksEvenWhenNoSpaceIsLeft() {
+        var saved = role(); saved.location = RecoveryLocation(space: "s-old", tab: nil)
+        var runtime = RecoveryRuntime(terminals: [shell("t1")]); runtime.layoutKnown = true
+        XCTAssertEqual(Recovery.plan(RecoveryRegistry(roles: [saved]), runtime: runtime, valid: { _ in nil }).first?.action, .blocked)
+        XCTAssertEqual(Recovery.plan(RecoveryRegistry(roles: [saved]), runtime: RecoveryRuntime(terminals: [shell("t1")]), valid: { _ in nil }).first?.action, .resume)
+    }
+
+    func testTheSaveSignatureFollowsTeamAndTitleLabels() {
+        XCTAssertNotEqual(Recovery.labelSignature(["team.id": "a", "x": "1"]), Recovery.labelSignature(["team.id": "b", "x": "1"]))
+        XCTAssertEqual(Recovery.labelSignature(["team.id": "a", "x": "1"]), Recovery.labelSignature(["team.id": "a", "x": "2"]))
     }
 }

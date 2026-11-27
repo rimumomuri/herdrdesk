@@ -677,7 +677,7 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
     private func scheduleRecoverySave(_ native: [Term]) {
         guard recoveryEnabled else { return }
         let agents = native.filter { $0.isAgent && $0.state == "live" }
-        let signature = agents.map { $0.address + ":" + $0.session + ":" + ($0.app ?? "") + ":" + ($0.role ?? "") }.sorted().joined(separator: "|")
+        let signature = agents.map { $0.address + ":" + $0.session + ":" + ($0.app ?? "") + ":" + Recovery.labelSignature($0.labels) }.sorted().joined(separator: "|")
         let turns = agents.map { $0.address + ":" + String($0.turn) }.sorted().joined(separator: "|")
         guard let delay = Recovery.saveDelay(checked: recoveryChecked == generation, structural: signature != recoverySignature,
                                              turns: turns != recoveryTurns, sinceLast: Date().timeIntervalSince(recoveryLastSave)) else { return }
@@ -700,13 +700,18 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
         recoveryQueue.async {
             guard let runtime = try? runner.collector.collect() else { return }
             let (registry, seenNow) = Recovery.merge(store.load(), runtime: runtime, seen: seen, now: RecoveryRunner.timestamp())
-            if registry != store.load() { try? store.save(registry) }
+            var saved = registry, failure = ""
+            if registry != store.load() {
+                do { try store.save(registry) } catch { saved = store.load(); failure = "the recovery list could not be saved: \(error)" }
+            }
             // The sidebar follows what runs now (a resume that finished starting, a shell left by a reboot).
-            let report = runner.check(registry, runtime: runtime)
+            let report = runner.check(saved, runtime: runtime)
             DispatchQueue.main.async {
                 guard self.generation == current else { return }
                 self.recoverySeen = seenNow
-                self.recoverySaved = registry
+                self.recoverySaved = saved
+                if !failure.isEmpty { self.recoveryError = String(failure.prefix(300)) }
+                else if self.recoveryError.hasPrefix("the recovery list could not be saved") { self.recoveryError = "" }
                 if self.recoveryBusy.isEmpty {
                     var report = report
                     // After a recovery the sidebar keeps its result (until dismissed) while later checks refresh the roles.
