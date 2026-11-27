@@ -18,7 +18,7 @@ import { companionState, companionSummary, featuredAgent } from './companion.js'
 import { agentTrouble, machineTrouble } from './trouble.js';
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest, mainMachineLabel } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText, boardSummaryHTML, BOARD_LABELS } from './task-board.js';
-import { questionFormHTML, questionFilesHTML, keepTyping, approvalSignature, approvalDock, approvalHeadHTML, keepHidden, headerState } from './chat-questions.js';
+import { questionFormHTML, questionFilesHTML, keepTyping, approvalSignature, approvalDock, approvalHeadHTML, keepHidden, headerState, APPROVAL_FOCUS } from './chat-questions.js';
 import { attentionOf, autoUnread, markSeen, snoozeActive, snoozeUntil, nextUrgent, waitingCount } from './triage.js';
 import { filterPalette, paletteHTML } from './palette.js';
 import { sendBlocked, deferredSaver } from './composer.js';
@@ -2536,7 +2536,7 @@ function revealQuestions() {
   }
   if(selectedTab==='questions')selectedTab=currentRoom()?'team':'chat';
   detail();
-  $('#inlineApproval').querySelector('textarea,button:not(:disabled)')?.focus();
+  $('#inlineApproval').querySelector(APPROVAL_FOCUS)?.focus();
 }
 $('#inlineHandoff').addEventListener('click',()=>{
   selectedTab='team';
@@ -2595,7 +2595,7 @@ $('#arrivalOpen').addEventListener('click',()=>{
 $('#approvalPill').addEventListener('click',()=>{
   approvalHidden=null;$('#approvalPill').hidden=true;
   const panel=$('#inlineApproval');panel.hidden=!approvalCurrent;
-  panel.querySelector('textarea,button:not([data-approval-hide]):not(:disabled)')?.focus();
+  panel.querySelector(APPROVAL_FOCUS)?.focus();
 });
 $('#arrivalDismiss').addEventListener('click',()=>{arrivalID=null;$('#arrival').hidden=true;});
 $('#lanes').addEventListener('click',event=>{

@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {approvalSignature, approvalDock, approvalHeadHTML, keepHidden, headerState} from '../Resources/web/chat-questions.js';
+import {approvalSignature, approvalDock, approvalHeadHTML, keepHidden, headerState, APPROVAL_FOCUS} from '../Resources/web/chat-questions.js';
 
 const copy = key => ({approvalWaitingTitle:'답변 대기', approvalHide:'숨기기', approvalShow:'다시 보기'})[key] || key;
 
@@ -79,4 +79,11 @@ test('a working header breathes, unless the person asked for less motion', () =>
   assert.match(css, /\[data-chat-state=working\] \.detail \.identity \{[^}]*animation:chat-state-breathe/);
   assert.match(css, /@keyframes chat-state-breathe/);
   assert.match(css, /prefers-reduced-motion:reduce\) \{[^}]*\[data-chat-state=working\] \.detail \.identity \{ animation:none/);
+});
+
+test('opening a waiting item focuses its answer or action, never the hide button', () => {
+  assert.match(APPROVAL_FOCUS, /textarea/);
+  assert.match(APPROVAL_FOCUS, /:not\(\[data-approval-hide\]\)/);
+  const app = readFileSync(new URL('../Resources/web/app.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(app, /\$\('#inlineApproval'\)\.querySelector\('textarea,button:not\(:disabled\)'\)/);
 });

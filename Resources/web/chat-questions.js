@@ -64,3 +64,6 @@ export const keepHidden = (signature, hidden) => hidden && hidden === signature 
 
 /** The conversation header's state color: something waiting on the person first, then work in progress, else none. */
 export const headerState = ({ waiting = false, working = false } = {}) => waiting ? 'answer' : working ? 'working' : '';
+
+/** What to focus when a waiting item is opened: its answer box or action, never the hide button. */
+export const APPROVAL_FOCUS = 'textarea,button:not([data-approval-hide]):not(:disabled)';
