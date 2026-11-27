@@ -733,11 +733,19 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                 DispatchQueue.main.async { if self.generation == current { self.retryRecoverySave(after: 30) } }
                 return
             }
-            let (registry, seenNow) = Recovery.merge(store.load(), runtime: runtime, seen: seen, now: RecoveryRunner.timestamp())
-            var saved = registry, failure = ""
-            guard self.recoveryEpochBox.value == epoch else { return }   // Core went away meanwhile
-            if registry != store.load() {
-                do { try store.save(registry) } catch { saved = store.load(); failure = "the recovery list could not be saved: \(error)" }
+            var seenNow = seen, saved = RecoveryRegistry(), failure = ""
+            let locked: Bool = (try? store.exclusively {
+                let (registry, seenAfter) = Recovery.merge(store.load(), runtime: runtime, seen: seen, now: RecoveryRunner.timestamp())
+                seenNow = seenAfter
+                saved = registry
+                guard self.recoveryEpochBox.value == epoch else { saved = store.load(); return }   // Core went away meanwhile
+                if registry != store.load() {
+                    do { try store.save(registry) } catch { saved = store.load(); failure = "the recovery list could not be saved: \(error)" }
+                }
+            }) != nil
+            guard locked else {                      // a recovery holds the list right now: try again shortly
+                DispatchQueue.main.async { if self.generation == current { self.retryRecoverySave(after: 15) } }
+                return
             }
             // The sidebar follows what runs now (a resume that finished starting, a shell left by a reboot).
             let report = runner.check(saved, runtime: runtime)
@@ -766,7 +774,7 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
         let store = recoveryStore
         recoveryQueue.async {
             var report: RecoveryReport?, failure = ""
-            do { report = restore ? try runner.restore(store.load()) : try runner.check(store.load()) }
+            do { report = try store.exclusively { restore ? try runner.restore(store.load()) : try runner.check(store.load()) } }
             catch { failure = String("\(error)".prefix(300)) }
             DispatchQueue.main.async {
                 self.recoveryBusy = ""
@@ -1206,11 +1214,15 @@ if CommandLine.arguments.dropFirst().first == "--recovery" {
     do {
         switch action {
         case "save":
-            let (registry, _) = Recovery.merge(store.load(), runtime: try runner.collector.collect(), seen: [], now: RecoveryRunner.timestamp())
-            try store.save(registry)
+            let runtime = try runner.collector.collect()
+            let registry = try store.exclusively { () throws -> RecoveryRegistry in
+                let (registry, _) = Recovery.merge(store.load(), runtime: runtime, seen: [], now: RecoveryRunner.timestamp())
+                try store.save(registry)
+                return registry
+            }
             FileHandle.standardOutput.write(Data("saved \(registry.roles.count) agents to \(store.url.path)\n".utf8))
         default:
-            let report = action == "restore" ? try runner.restore(store.load()) : try runner.check(store.load())
+            let report = try store.exclusively { action == "restore" ? try runner.restore(store.load()) : try runner.check(store.load()) }
             FileHandle.standardOutput.write(try encoder.encode(report)); FileHandle.standardOutput.write(Data([10]))
             exit(report.ready ? 0 : 2)
         }

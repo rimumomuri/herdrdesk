@@ -241,6 +241,7 @@ public enum Recovery {
             if let found = byKey[old.key] {
                 guard found.count == 1 else { roles.append(old); continue }   // ambiguous: keep what was saved
                 var updated = role(for: found[0], key: old.key, among: runtime.terminals, now: now)
+                if !runtime.layoutKnown { updated.location = old.location }   // the Herdr app did not answer this time
                 // A lead that is not running right now (still starting, or not resumed yet) keeps its place.
                 if updated.parentRole == nil, let parent = old.parentRole, registry.roles.contains(where: { $0.key == parent }) {
                     updated.parentRole = parent

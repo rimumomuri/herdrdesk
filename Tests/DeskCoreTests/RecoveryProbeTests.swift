@@ -161,4 +161,16 @@ final class RecoveryProbeTests: XCTestCase {
         XCTAssertEqual(RecoveryRunner.parentAddress(for: "local:\(parentSid)", in: RecoveryRegistry(roles: [parent]), runtime: runtime), "t7")
         XCTAssertNil(RecoveryRunner.parentAddress(for: nil, in: RecoveryRegistry(roles: [parent]), runtime: runtime))
     }
+
+    func testOnlyOneRecoveryRunsAtATimeAcrossProcesses() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = RecoveryStore(url: folder.appendingPathComponent("recovery.json"))
+        var inner: Error?
+        try store.exclusively {
+            do { try store.exclusively { } } catch { inner = error }
+        }
+        XCTAssertNotNil(inner)
+        XCTAssertNoThrow(try store.exclusively { })
+        try? FileManager.default.removeItem(at: folder)
+    }
 }

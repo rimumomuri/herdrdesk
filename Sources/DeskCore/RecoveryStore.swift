@@ -11,6 +11,19 @@ public struct RecoveryStore {
         return registry
     }
 
+    /// Runs `body` while holding the recovery lock, shared by the app and `HerdrDesk --recovery`. Throws at once when
+    /// another recovery or save holds it.
+    public func exclusively<T>(_ body: () throws -> T) throws -> T {
+        let folder = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        let fd = open(folder.appendingPathComponent(".recovery.lock").path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+        guard fd >= 0 else { throw RecoveryError("cannot open the recovery lock") }
+        defer { close(fd) }
+        guard flock(fd, LOCK_EX | LOCK_NB) == 0 else { throw RecoveryError("another recovery is already running") }
+        defer { flock(fd, LOCK_UN) }
+        return try body()
+    }
+
     public func save(_ registry: RecoveryRegistry) throws {
         let folder = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])

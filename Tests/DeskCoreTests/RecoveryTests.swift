@@ -288,4 +288,10 @@ final class RecoveryTests: XCTestCase {
         let (saved, _) = Recovery.merge(before, runtime: RecoveryRuntime(terminals: [runningWorker]), seen: [], now: "t2")
         XCTAssertEqual(saved.roles.first { $0.key == "worker" }?.parentRole, "lead")
     }
+
+    func testAnUnknownLayoutKeepsTheSavedPlace() {
+        var saved = role(); saved.location = RecoveryLocation(space: "s1", tab: "b1")
+        let (after, _) = Recovery.merge(RecoveryRegistry(roles: [saved]), runtime: RecoveryRuntime(terminals: [agentTerm("t1")]), seen: [], now: "t2")
+        XCTAssertEqual(after.roles.first?.location, saved.location)
+    }
 }
