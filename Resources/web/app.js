@@ -25,7 +25,7 @@ import { filterPalette, paletteHTML } from './palette.js';
 import { sendBlocked, deferredSaver } from './composer.js';
 import { freshEntries } from './motion.js';
 import { stickyScroll } from './chat-scroll.js';
-import { makeInventory, makeTeamDirectory, listedGroup, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus, memoLast, workingSince, elapsedText, modelInUse } from './model.js';
+import { makeInventory, makeTeamDirectory, listedGroup, sendable, registeredQuestions, explicitHandoffs, attentionCount, mergeConversationRecords, completedAgentTurn, observedAgentStatus, memoLast, workingSince, finishedAt, elapsedText, modelInUse } from './model.js';
 import { legacyDraftKey, retiredRoleName, archiveRoles, combineChat, appendLegacySend, draftFor, storeDraftFor, storeJSON, LEGACY_SEND_LIMIT } from './compatibility.js';
 import { enterAction, SEND_DEDUPE_MS } from './keys.js';
 import { createTerminalView } from './terminal-view.js';
@@ -197,7 +197,7 @@ function pushCompanion(){
   const now=Date.now(), seenWaiting=new Set();
   const stats=companionStats({
     working:live.filter(workingNow).map(term=>({name:term.label||term.address,since:workingSince(term,snapshot.liveTurns?.[sessionKey(term)])||now})),
-    done:live.filter(term=>!workingNow(term)&&term.status==='done'&&Number.isFinite(term.statusMs)).map(term=>({name:term.label||term.address,at:term.statusMs})),
+    done:live.filter(term=>effectiveStatus(term)==='done').map(term=>({name:term.label||term.address,at:finishedAt(term,snapshot.liveTurns?.[sessionKey(term)])})).filter(row=>Number.isFinite(row.at)),
     waiting:companionAttention().filter(item=>!seenWaiting.has(item.address)&&seenWaiting.add(item.address))
       .map(item=>({name:inventory.find(term=>term.address===item.address)?.label||item.team})),
   },now,{s:copy('elapsedS'),ms:copy('elapsedMS'),hm:copy('elapsedHM')},copy);

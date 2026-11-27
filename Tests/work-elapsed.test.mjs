@@ -22,3 +22,12 @@ test('elapsed time reads like the terminal: seconds, then minutes and seconds, t
   assert.equal(elapsedText(64 * 60_000 + 59_000, units), '1시간 4분');
   assert.equal(elapsedText(-5, units), '0초');
 });
+
+test('a finish time comes from the newer of the terminal status and the reported turn end', async () => {
+  const {finishedAt} = await import('../Resources/web/model.js');
+  assert.equal(finishedAt({statusMs: 1000}, null), 1000);
+  assert.equal(finishedAt({statusMs: 1000}, {state: 'done', at: new Date(5000).toISOString()}), 5000);
+  assert.equal(finishedAt({statusMs: 9000}, {state: 'done', at: new Date(5000).toISOString()}), 9000);
+  assert.equal(finishedAt({statusMs: 1000}, {state: 'working', at: new Date(5000).toISOString()}), 1000);
+  assert.equal(finishedAt({}, null), null);
+});
