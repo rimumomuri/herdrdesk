@@ -294,4 +294,14 @@ final class RecoveryTests: XCTestCase {
         let (after, _) = Recovery.merge(RecoveryRegistry(roles: [saved]), runtime: RecoveryRuntime(terminals: [agentTerm("t1")]), seen: [], now: "t2")
         XCTAssertEqual(after.roles.first?.location, saved.location)
     }
+
+    func testAnOldLaunchMarkOnAShellNoLongerBlocks() {
+        let now = ISO8601DateFormatter().date(from: "2026-11-27T05:00:00Z")!
+        var stale = shell("t1"); stale.labels["recovery.launching"] = sid; stale.labels["recovery.launching-at"] = "2026-11-27T04:30:00Z"
+        XCTAssertEqual(Recovery.choose(role(), stale, online: true, now: now).0, .resume)
+        var fresh = stale; fresh.labels["recovery.launching-at"] = "2026-11-27T04:58:00Z"
+        XCTAssertEqual(Recovery.choose(role(), fresh, online: true, now: now).0, .pending)
+        var unknown = stale; unknown.labels["recovery.launching-at"] = nil
+        XCTAssertEqual(Recovery.choose(role(), unknown, online: true, now: now).0, .pending)
+    }
 }

@@ -749,6 +749,7 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
             }
             // The sidebar follows what runs now (a resume that finished starting, a shell left by a reboot).
             let report = runner.check(saved, runtime: runtime)
+            runner.clearLaunchMarks(saved, runtime: runtime)
             DispatchQueue.main.async {
                 guard self.generation == current, self.recoveryEpoch == epoch else { return }
                 self.recoverySeen = seenNow

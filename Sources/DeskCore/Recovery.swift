@@ -167,12 +167,12 @@ public enum Recovery {
     }
 
     /// What to do with a saved role, given the terminal that holds it now (same rules as herdr-recover).
-    public static func choose(_ role: RecoveryRole, _ actual: ObservedTerminal?, online: Bool) -> (RecoveryAction, String) {
+    public static func choose(_ role: RecoveryRole, _ actual: ObservedTerminal?, online: Bool, now: Date = Date()) -> (RecoveryAction, String) {
         guard online else { return (.offline, "machine is not connected; left untouched") }
         guard let actual else { return (.create, "no terminal holds it; resume it in a new terminal") }
         // A verified match counts as running even while it still carries the launch mark of its own resume.
         if actual.agent == role.agent, actual.sessionId == role.sessionId { return (.skip, "the same conversation is already running") }
-        if actual.launching { return (.pending, "a resume was already started; check its startup screen first") }
+        if actual.launching, !staleLaunch(actual, now: now) { return (.pending, "a resume was already started; check its startup screen first") }
         if actual.agent != nil { return (.blocked, "a different or unverified conversation runs there") }
         if actual.shell { return (.resume, "only a shell is left; resume the exact conversation") }
         return (.blocked, "the foreground program is not a plain shell")
@@ -199,6 +199,13 @@ public enum Recovery {
             candidates = [same]
         }
         return (candidates.first, true)
+    }
+
+    /// A launch mark more than ten minutes old on a plain shell: the start did not survive (a reboot, a failed start).
+    static func staleLaunch(_ terminal: ObservedTerminal, now: Date) -> Bool {
+        guard terminal.shell, terminal.agent == nil, let at = terminal.labels["recovery.launching-at"],
+              let started = ISO8601DateFormatter().date(from: at) else { return false }
+        return now.timeIntervalSince(started) > 600
     }
 
     // MARK: saving

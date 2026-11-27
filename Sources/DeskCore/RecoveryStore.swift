@@ -127,6 +127,15 @@ public struct RecoveryRunner {
         return actual.address
     }
 
+    /// Clears the launch mark of every saved role that is verified running (a slow start that finished later).
+    public func clearLaunchMarks(_ registry: RecoveryRegistry, runtime: RecoveryRuntime) {
+        for role in registry.roles {
+            guard let (current, online) = try? Recovery.resolve(role, in: runtime), let current, current.launching,
+                  Recovery.choose(role, current, online: online).0 == .skip else { continue }
+            _ = hc.run(["label", current.address, "recovery.launching=", "recovery.launching-at="], timeout: 10)
+        }
+    }
+
     /// Once a role runs again, the shell it left behind gives up its role labels. The shell and its input stay.
     func retire(_ registry: RecoveryRegistry, runtime: RecoveryRuntime) -> [String] {
         var retired: [String] = []
