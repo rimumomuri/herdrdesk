@@ -129,19 +129,21 @@ public enum Recovery {
             let shellCommand = word.range(of: #"^-[a-z]*c[a-z]*$"#, options: .regularExpression) != nil
                 && index > 0 && shells.contains(URL(fileURLWithPath: argv[index - 1]).lastPathComponent)
             if shellCommand, index + 1 < argv.count, depth < 4 {
-                result.formUnion(options(shellWords(argv[index + 1]), depth: depth + 1))
+                for command in shellCommands(argv[index + 1]) { result.formUnion(options(command, depth: depth + 1)) }
                 index += 2
                 continue
             }
+            if word == "--" { break }        // the rest are arguments, not options
             result.insert(word)
             index += 1
         }
         return result
     }
 
-    /// Splits a command line the way sh does for quotes and backslashes (no expansion).
-    static func shellWords(_ line: String) -> [String] {
-        var words: [String] = [], current = "", inWord = false
+    /// Splits a command line into its commands (at ; & |) and their words, the way sh does for quotes and backslashes
+    /// (no expansion).
+    static func shellCommands(_ line: String) -> [[String]] {
+        var commands: [[String]] = [], words: [String] = [], current = "", inWord = false
         var chars = Array(line)[...]
         while let c = chars.popFirst() {
             switch c {
@@ -156,14 +158,18 @@ public enum Recovery {
             case "\\":
                 inWord = true
                 if let next = chars.popFirst() { current.append(next) }
-            case " ", "\t", "\n", ";", "&", "|":
+            case " ", "\t":
                 if inWord { words.append(current); current = ""; inWord = false }
+            case "\n", ";", "&", "|":
+                if inWord { words.append(current); current = ""; inWord = false }
+                if !words.isEmpty { commands.append(words); words = [] }
             default:
                 inWord = true; current.append(c)
             }
         }
         if inWord { words.append(current) }
-        return words
+        if !words.isEmpty { commands.append(words) }
+        return commands
     }
 
     /// What to do with a saved role, given the terminal that holds it now (same rules as herdr-recover).

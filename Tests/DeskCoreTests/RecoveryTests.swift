@@ -304,4 +304,10 @@ final class RecoveryTests: XCTestCase {
         var unknown = stale; unknown.labels["recovery.launching-at"] = nil
         XCTAssertEqual(Recovery.choose(role(), unknown, online: true, now: now).0, .pending)
     }
+
+    func testNothingAfterTheOptionEndCountsAsABypass() {
+        XCTAssertFalse(Recovery.bypass(["codex", "--", "--dangerously-bypass-approvals-and-sandbox"]))
+        XCTAssertFalse(Recovery.bypass(["/bin/zsh", "-lic", "exec claude -- --dangerously-skip-permissions"]))
+        XCTAssertTrue(Recovery.bypass(["/bin/zsh", "-lic", "exec claude --dangerously-skip-permissions -- hi"]))
+    }
 }
