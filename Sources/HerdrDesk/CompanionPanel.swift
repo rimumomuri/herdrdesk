@@ -25,7 +25,11 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
             addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
         }
         override func mouseEntered(with event: NSEvent) { if drag.acceptsHover { onHover?(true) } }
-        override func mouseExited(with event: NSEvent) { if drag.acceptsHover { onHover?(false) } }
+        override func mouseExited(with event: NSEvent) {
+            // a resize re-creates the tracking area; the pointer still over the window is not leaving it
+            if let window, window.frame.contains(NSEvent.mouseLocation) { return }
+            if drag.acceptsHover { onHover?(false) }
+        }
         override func mouseDown(with event: NSEvent) { drag.press(at: NSEvent.mouseLocation, origin: window?.frame.origin ?? .zero) }
         override func mouseDragged(with event: NSEvent) {
             guard let window else { return }
@@ -102,7 +106,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         surface.onClick = { [weak self] in self?.onOpen?() }
         surface.onHover = { [weak self] in self?.setHover($0) }
         surface.onMoved = { [weak self] in self?.savePlace() }
-        surface.onDragStart = { [weak self] in self?.setHover(false) }
+        surface.onDragStart = { [weak self] in self?.collapseNow() }
         surface.scrollTarget = web
         surface.onMenu = { [weak self] in self?.showMenu($0) }
         let saved = defaults.string(forKey: "companionOrigin").map(NSPointFromString)
@@ -135,7 +139,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         state = next
         draw()
         refresh()
-        if hovering { hovering = false; setHover(true) }   // the panel's rows changed: fit the window to them again
+        if hovering { layoutHover() }   // the panel's rows may have changed: fit the window to them (no-op when unchanged)
     }
 
     private func refresh() {
@@ -166,26 +170,60 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
 
     private func setHover(_ on: Bool) {
         guard on != hovering else { return }
-        let sheep = NSRect(origin: sheepOrigin(), size: NSSize(width: CompanionLayout.side, height: CompanionLayout.side))
         hovering = on
-        bubbleRight = false
-        bubbleDown = false
+        layoutHover()
+    }
+
+    /// A drag reads the window's origin right away: shrink to the sheep now and let the page catch up.
+    private func collapseNow() {
+        guard hovering else { return }
+        let sheep = NSRect(origin: sheepOrigin(), size: NSSize(width: CompanionLayout.side, height: CompanionLayout.side))
+        hovering = false
+        panel.setFrame(sheep, display: true)
+        bubbleRight = false; bubbleDown = false
+        reveal(false) { [weak self] in self?.direction() }
+    }
+
+    /// Opens or closes the panel without moving the sheep: to open, the page first pins the sheep to the corner it keeps,
+    /// then the window grows, then the panel shows; to close, the panel hides, the window shrinks, then the pin resets.
+    /// The sheep is pinned to a window corner in the page, so no step of this ever moves it on screen.
+    private func layoutHover() {
+        let sheep = NSRect(origin: sheepOrigin(), size: NSSize(width: CompanionLayout.side, height: CompanionLayout.side))
         let stats = state?["stats"] as? [[String: Any]] ?? []
-        if on && (!stats.isEmpty || !((state?["lines"] as? [String])?.isEmpty ?? true)) {
-            let rows = stats.map { (($0["rows"] as? [Any])?.count ?? 0) + ((($0["more"] as? String) ?? "").isEmpty ? 0 : 1) }
-            let mood = state?["mood"] as? String ?? ""
-            let notices = ["offline", "limit"].contains(mood) ? ((state?["lines"] as? [String])?.count ?? 0) : 0
-            let open = CompanionLayout.expanded(sheep: sheep, screens: Self.screens(), height: CompanionLayout.panelHeight(sections: rows, lines: notices))
-            bubbleRight = open.bubbleRight
-            bubbleDown = open.down
-            panel.setFrame(open.frame, display: true)
-        } else {
-            panel.setFrame(sheep, display: true)
+        let lines = (state?["lines"] as? [String]) ?? []
+        guard hovering, !stats.isEmpty || !lines.isEmpty else {
+            reveal(false) { [weak self] in
+                guard let self else { return }
+                if self.panel.frame != sheep { self.panel.setFrame(sheep, display: true) }
+                self.bubbleRight = false; self.bubbleDown = false
+                self.direction()
+            }
+            return
         }
-        if pageReady {
-            web.callAsyncJavaScript("window.companion.hover(on, right, down)", arguments: ["on": on, "right": bubbleRight, "down": bubbleDown],
-                                    in: nil, in: .page, completionHandler: nil)
+        let rows = stats.map { (($0["rows"] as? [Any])?.count ?? 0) + ((($0["more"] as? String) ?? "").isEmpty ? 0 : 1) }
+        let mood = state?["mood"] as? String ?? ""
+        let notices = ["offline", "limit"].contains(mood) ? lines.count : 0
+        let open = CompanionLayout.expanded(sheep: sheep, screens: Self.screens(),
+                                            height: stats.isEmpty ? nil : CompanionLayout.panelHeight(sections: rows, lines: notices))
+        let turned = open.bubbleRight != bubbleRight || open.down != bubbleDown
+        bubbleRight = open.bubbleRight; bubbleDown = open.down
+        let grow = { [weak self] in
+            guard let self else { return }
+            if self.panel.frame != open.frame { self.panel.setFrame(open.frame, display: true) }
+            self.reveal(true)
         }
+        if turned { direction(then: grow) } else { grow() }
+    }
+
+    private func direction(then next: (() -> Void)? = nil) {
+        guard pageReady else { next?(); return }
+        web.callAsyncJavaScript("window.companion.direction(right, down)", arguments: ["right": bubbleRight, "down": bubbleDown],
+                                in: nil, in: .page) { _ in next?() }
+    }
+
+    private func reveal(_ on: Bool, then next: (() -> Void)? = nil) {
+        guard pageReady else { next?(); return }
+        web.callAsyncJavaScript("window.companion.reveal(on)", arguments: ["on": on], in: nil, in: .page) { _ in next?() }
     }
 
     /// The sheep's own place: the right end of the window (left while the panel opens right), at its bottom (top while
