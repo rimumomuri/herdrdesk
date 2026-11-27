@@ -16,6 +16,7 @@ import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick, playsDoneSou
 import { sheep } from './sheep.js';
 import { companionState, companionSummary, featuredAgent } from './companion.js';
 import { agentTrouble, machineTrouble } from './trouble.js';
+import { recoveryBarHTML, recoverySettingsHTML } from './recovery.js';
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest, mainMachineLabel } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText, boardSummaryHTML, BOARD_LABELS } from './task-board.js';
 import { questionFormHTML, questionFilesHTML, keepTyping, approvalSignature, approvalDock, approvalHeadHTML, keepHidden, headerState, APPROVAL_FOCUS } from './chat-questions.js';
@@ -744,6 +745,7 @@ function renderRooms(){
   clearTimeout(snoozeTimer);
   if(Number.isFinite(due))snoozeTimer=setTimeout(renderRooms,Math.min(Math.max(due-now+50,1000),2**31-1));
   sidebarRows=new Map(rows.map(row=>[row.key,row]));
+  renderRecovery();
   setPanel('#computerStrip',computerStripHTML(computerRows(snapshot.tasks?.machines||[],snapshot.machines||[],inventory,workingNow),copy,escape));
   renderComputerSheet();
   const shown=rows.filter(row=>!chatHidden(row,chatPreferences.get(row.key))&&!snoozed.has(row.key));
@@ -1774,6 +1776,25 @@ document.addEventListener('click',event=>{
   }
   post({type:'waitingTarget',...lineage,kind:item.kind,requestID:item.requestId||'',actorAddress:item.actor.address,actorSession:item.actor.session,actorRole:item.actor.role,
     address:item.target.address,session:item.target.session,role:item.target.role});
+});
+
+// Agent recovery: the sidebar bar (asks once before resuming) and the settings line.
+const recoveryUI={confirming:false,dismissed:''};
+const recoveryTime=at=>{try{return new Intl.DateTimeFormat(language,{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(at));}catch{return '';}};
+function renderRecovery(){
+  const rec=snapshot?.recovery;
+  if(!rec?.report||!rec.report.roles.some(role=>role.action==='resume'||role.action==='create')||rec.busy)recoveryUI.confirming=false;
+  setPanel('#recoveryBar',recoveryBarHTML(rec,recoveryUI,copy,escape));
+  setPanel('#recoverySettings',recoverySettingsHTML(rec,copy,escape,recoveryTime));
+}
+for(const id of ['#recoveryBar','#recoverySettings'])$(id).addEventListener('click',event=>{
+  const action=event.target.closest('[data-recovery]')?.dataset.recovery;
+  if(!action)return;
+  if(action==='confirm')recoveryUI.confirming=true;
+  else if(action==='cancel')recoveryUI.confirming=false;
+  else if(action==='dismiss')recoveryUI.dismissed=snapshot?.recovery?.report?.at||'';
+  else if(action==='restore'||action==='check'){recoveryUI.confirming=false;post({type:'recovery',action});}
+  renderRecovery();
 });
 
 function render() {

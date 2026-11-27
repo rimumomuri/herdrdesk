@@ -1366,6 +1366,25 @@ main[data-page=conversations] .feed-row[data-transfer] { max-width:min(100%,880p
 }
 
 /* Computers: one quiet line each — dot, name, weight class, card workers in use. */
+/* Agent recovery: a quiet bar above the computers, only when there is something to recover or report. */
+#recoveryBar:empty { display:none }
+.recovery-bar { margin-top:12px; padding:8px 10px; border-radius:10px; display:grid; gap:6px; font-size:12px;
+  background:color-mix(in srgb,#f0a23a 14%,transparent); color:#ffd59c }
+.recovery-bar[data-state=done] { background:color-mix(in srgb,#3ccf7e 14%,transparent); color:#a6f0c6 }
+.recovery-bar[data-state=busy] { display:flex; align-items:center; gap:8px; color:var(--muted); background:var(--card) }
+.recovery-bar[data-state=error] { background:color-mix(in srgb,#e5534b 14%,transparent); color:#ffb4ae }
+.recovery-bar[data-state=done], .recovery-bar[data-state=attention] { grid-template-columns:minmax(0,1fr) auto; align-items:start }
+.recovery-bar .recovery-details { grid-column:1 / -1 }
+.recovery-main { width:100%; text-align:left; font-size:12px; color:inherit; background:color-mix(in srgb,#f0a23a 22%,transparent); border-color:color-mix(in srgb,#f0a23a 45%,transparent) }
+.recovery-details { margin:0; padding-left:16px; color:var(--muted); font-size:11px; display:grid; gap:2px }
+.recovery-actions { display:flex; gap:6px }
+.recovery-close { padding:0 6px; font-size:13px; line-height:1.4 }
+.recovery-spin { width:10px; height:10px; border-radius:50%; border:2px solid currentColor; border-right-color:transparent; animation:recovery-spin .9s linear infinite }
+@keyframes recovery-spin { to { transform:rotate(360deg) } }
+@media (prefers-reduced-motion:reduce) { .recovery-spin { animation:none } }
+.recovery-settings:empty { display:none }
+.recovery-settings-line { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; color:var(--muted) }
+.recovery-settings-line button { font-size:11px; white-space:nowrap }
 .computer-strip { margin-top:14px; padding-top:10px; border-top:1px solid var(--line); display:grid; gap:4px }
 .computer-title { margin:0 0 2px; font-size:11px; font-weight:650; color:var(--muted) }
 .computer-row { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink) }

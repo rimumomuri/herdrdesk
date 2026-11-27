@@ -121,6 +121,25 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
     private let environment = ProcessInfo.processInfo.environment
     private var isolated: Bool { environment["HERDRDESK_HC"] != nil }
 
+    // MARK: agent recovery state
+    private let recoveryStore = RecoveryStore()
+    private let recoveryQueue = DispatchQueue(label: "herdrdesk.recovery", qos: .utility)
+    /// Saved roles seen running during this live connection (a role that disappears after that was closed on purpose).
+    private var recoverySeen = Set<String>()
+    private var recoverySignature = ""
+    private var recoveryTurns = ""
+    private var recoveryChecked = -1       // the connection generation whose first check ran
+    /// Bumped whenever Core goes away; a save started before that writes nothing.
+    private let recoveryEpochBox = RecoveryEpoch()
+    private var recoveryEpoch: Int { recoveryEpochBox.value }
+    private var recoveryLastSave = Date.distantPast
+    private var recoverySave: DispatchWorkItem?
+    private var recoveryBusy = ""          // "", "checking", "restoring"
+    private var recoveryReport: RecoveryReport?
+    private var recoveryError = ""
+    private lazy var recoverySaved = recoveryStore.load()
+    private var recoveryEnabled: Bool { !isolated }
+
     func applicationDidFinishLaunching(_ note: Notification) {
         updateMenu(preferences.string(forKey: "displayLocale") ?? Locale.preferredLanguages.first ?? "en")
         let configuration = WKWebViewConfiguration()
@@ -170,6 +189,9 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
         terms = []
         liveChat.track([])
         liveTurns.removeAll()
+        recoverySeen = []
+        recoverySignature = ""
+        recoveryTurns = ""
         candidates = []
         spaces = []
         machines = []
@@ -201,7 +223,14 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                     self.terminalEvent(watch.id, "ended", "gridChanged")
                 }
             }
-            if state == "live" { self.scheduleInventory() }
+            if state == "live" { self.scheduleInventory(); self.scheduleRecoverySave(native) }
+            else {
+                // Core went away (it may come back rebooted): what was seen before no longer proves a deliberate close.
+                self.recoverySeen = []
+                self.recoveryEpochBox.bump()
+                self.recoveryChecked = -1
+                self.recoverySignature = ""
+            }
             if !self.isolated && self.automaticChat { self.liveChat.track(state == "live" ? native : []) }
             self.observeHandoffs()
             self.push()
@@ -247,8 +276,10 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                 guard self.generation == current else { return }
                 self.inventoryBusy = false
                 self.lastInventory = Date()
+                let reconnected = Desk.machineStates(self.machines) != Desk.machineStates(machines)
                 self.machines = machines
                 self.spaces = spaces
+                if reconnected { self.scheduleRecoverySave(self.candidates) }   // a computer came back: check what it holds
                 self.push()
             }
         }
@@ -261,7 +292,7 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                                                          "connection": connection, "isolated": isolated, "ledger": questionLedger(),
                                                          "preferredLocale": Locale.preferredLanguages.first ?? "en",
                                                          "replies": replies, "teamMessages": teamMessages, "liveMessages": liveMessages + liveReplyArchive.entries, "liveTurns": liveTurns, "automaticChat": automaticChat, "archiveRoles": archiveRoles,
-                                                         "legacyProfile": DeskPaths.retainsLegacyProfile, "configuredTeams": configuredTeams, "lineage":lineageStore.publicJSON()].merging(handoffPayload()) { $1 }.merging(taskPayload()) { $1 })])
+                                                         "legacyProfile": DeskPaths.retainsLegacyProfile, "configuredTeams": configuredTeams, "lineage":lineageStore.publicJSON(), "recovery": recoveryPayload()].merging(handoffPayload()) { $1 }.merging(taskPayload()) { $1 })])
     }
 
     // MARK: handoffs
@@ -601,6 +632,15 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                     }
                 }
             }
+        case "recovery":
+            guard recoveryEnabled, recoveryBusy.isEmpty else { return }
+            switch field("action", 16) {
+            case "check": runRecovery(restore: false)
+            case "restore":
+                guard environment["HERDRDESK_NO_SEND"] != "1", window.isKeyWindow, NSApp.isActive else { return }
+                runRecovery(restore: true)
+            default: return
+            }
         case "terminalUnwatch":
             if field("id") == watch?.id { stopWatch() }
         case "terminalInput":
@@ -634,6 +674,130 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
             send(id: id, text: text, term: term, executable: executable, attachmentIDs: ids, key: key, conversationId:field("conversationId",256))
         default: break
         }
+    }
+
+    // MARK: agent recovery
+
+    static func machineStates(_ list: [[String: Any]]) -> String {
+        list.map { (($0["name"] as? String) ?? "") + "=" + (($0["state"] as? String) ?? "") }.sorted().joined(separator: ",")
+    }
+
+    private func recoveryRunner() -> RecoveryRunner? {
+        guard let executable else { return nil }
+        let locale = preferences.string(forKey: "displayLocale").map { String($0.prefix(2)) } ?? "en"
+        return RecoveryRunner(hc: ProcessHc(path: executable), app: appExecutable.map { ProcessHc(path: $0) }, locale: locale)
+    }
+
+    /// Saves again in the background: after the first look of a connection, when agents start, end or move, and (at most
+    /// once a minute) when their turns advance, which is where a new conversation inside the same agent shows up.
+    private func scheduleRecoverySave(_ native: [Term]) {
+        guard recoveryEnabled else { return }
+        let agents = native.filter { $0.isAgent && $0.state == "live" }
+        // Agents, plus terminals carrying a role (a shell a reboot left behind), plus which computers are connected.
+        let watched = native.filter { $0.state == "live" && ($0.isAgent || !($0.role ?? "").isEmpty) }
+        let rows: [String] = watched.map { term in
+            let app: String = term.app ?? ""
+            return term.address + ":" + term.session + ":" + app + ":" + Recovery.labelSignature(term.labels)
+        }
+        let signature: String = rows.sorted().joined(separator: "|") + "#" + Desk.machineStates(machines)
+        let turns = agents.map { $0.address + ":" + String($0.turn) }.sorted().joined(separator: "|")
+        guard let delay = Recovery.saveDelay(checked: recoveryChecked == generation, structural: signature != recoverySignature,
+                                             turns: turns != recoveryTurns, sinceLast: Date().timeIntervalSince(recoveryLastSave)) else { return }
+        let structural = signature != recoverySignature || recoveryChecked != generation
+        recoverySignature = signature
+        recoveryTurns = turns
+        if !structural, recoverySave != nil { return }      // a save is already on its way
+        recoveryChecked = generation
+        recoverySave?.cancel()
+        let item = DispatchWorkItem { [weak self] in self?.saveRecovery() }
+        recoverySave = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+    }
+
+    /// Tries the save again later (it was skipped during a check or could not collect).
+    private func retryRecoverySave(after delay: TimeInterval) {
+        guard recoverySave == nil else { return }
+        let item = DispatchWorkItem { [weak self] in self?.saveRecovery() }
+        recoverySave = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+    }
+
+    private func saveRecovery() {
+        recoverySave = nil
+        guard connection == "live", let runner = recoveryRunner() else { return }
+        guard recoveryBusy.isEmpty else { retryRecoverySave(after: 15); return }
+        let current = generation, epoch = recoveryEpoch, seen = recoverySeen, store = recoveryStore
+        recoveryLastSave = Date()
+        recoveryQueue.async {
+            guard let runtime = try? runner.collector.collect() else {
+                DispatchQueue.main.async { if self.generation == current { self.retryRecoverySave(after: 30) } }
+                return
+            }
+            var seenNow = seen, saved = RecoveryRegistry(), failure = ""
+            let locked: Bool = (try? store.exclusively {
+                let (registry, seenAfter) = Recovery.merge(store.load(), runtime: runtime, seen: seen, now: RecoveryRunner.timestamp())
+                seenNow = seenAfter
+                saved = registry
+                guard self.recoveryEpochBox.value == epoch else { saved = store.load(); return }   // Core went away meanwhile
+                if registry != store.load() {
+                    do { try store.save(registry) } catch { saved = store.load(); failure = "the recovery list could not be saved: \(error)" }
+                }
+            }) != nil
+            guard locked else {                      // a recovery holds the list right now: try again shortly
+                DispatchQueue.main.async { if self.generation == current { self.retryRecoverySave(after: 15) } }
+                return
+            }
+            // The sidebar follows what runs now (a resume that finished starting, a shell left by a reboot).
+            let report = runner.check(saved, runtime: runtime)
+            runner.retire(saved, runtime: runtime)      // a start that finished late: clear its mark and its old shell's role
+            DispatchQueue.main.async {
+                guard self.generation == current, self.recoveryEpoch == epoch else { return }
+                self.recoverySeen = seenNow
+                self.recoverySaved = saved
+                if !failure.isEmpty { self.recoveryError = String(failure.prefix(300)) }
+                else if self.recoveryError.hasPrefix("the recovery list could not be saved") { self.recoveryError = "" }
+                if self.recoveryBusy.isEmpty {
+                    var report = report
+                    // After a recovery the sidebar keeps its result (until dismissed) while later checks refresh the roles.
+                    if let last = self.recoveryReport, last.applied { report.applied = true; report.at = last.at }
+                    self.recoveryReport = report
+                }
+                self.push()
+            }
+        }
+    }
+
+    private func runRecovery(restore: Bool) {
+        guard let runner = recoveryRunner() else { return }
+        recoveryBusy = restore ? "restoring" : "checking"
+        recoveryError = ""
+        push()
+        let store = recoveryStore
+        recoveryQueue.async {
+            var report: RecoveryReport?, failure = ""
+            do { report = try store.exclusively { restore ? try runner.restore(store.load()) : try runner.check(store.load()) } }
+            catch { failure = String("\(error)".prefix(300)) }
+            DispatchQueue.main.async {
+                self.recoveryBusy = ""
+                self.recoveryError = failure
+                if let report { self.recoveryReport = report }
+                self.push()
+                self.recoverySignature = ""      // save (and refresh the sidebar) again from what runs now
+                self.scheduleRecoverySave(self.candidates)
+            }
+        }
+    }
+
+    private func recoveryPayload() -> [String: Any] {
+        guard recoveryEnabled else { return ["enabled": false] }
+        var payload: [String: Any] = ["enabled": true, "saved": recoverySaved.roles.count, "savedAt": recoverySaved.savedAt ?? "",
+                                      "busy": recoveryBusy, "error": recoveryError]
+        if let report = recoveryReport {
+            payload["report"] = ["at": report.at, "applied": report.applied, "ready": report.ready, "resumable": report.resumable,
+                                 "attention": report.needsAttention,
+                                 "roles": report.roles.map { ["title": $0.title, "action": $0.action.rawValue, "reason": $0.reason] }]
+        }
+        return payload
     }
 
     private func sender() -> AnswerSender? {
@@ -1029,6 +1193,45 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
     }
 }
 
+/// A counter read from the recovery queue and bumped on the main thread.
+final class RecoveryEpoch: @unchecked Sendable {
+    private let lock = NSLock()
+    private var current = 0
+    var value: Int { lock.lock(); defer { lock.unlock() }; return current }
+    func bump() { lock.lock(); current += 1; lock.unlock() }
+}
+
+if CommandLine.arguments.dropFirst().first == "--recovery" {
+    // `HerdrDesk --recovery check|save|restore`: the same recovery as the app's button, from a terminal.
+    let action = CommandLine.arguments.dropFirst(2).first ?? "check"
+    guard ["check", "save", "restore"].contains(action), let hc = ProcessHc.resolvePath() else {
+        FileHandle.standardError.write(Data("usage: HerdrDesk --recovery check|save|restore\n".utf8)); exit(64)
+    }
+    let app = ProcessHc.resolveExecutable("herdr-app", overrides: [ProcessInfo.processInfo.environment["HERDRDESK_APP"]]).map { ProcessHc(path: $0) }
+    let locale = UserDefaults.standard.string(forKey: "displayLocale").map { String($0.prefix(2)) } ?? "en"
+    let runner = RecoveryRunner(hc: ProcessHc(path: hc), app: app, locale: locale)
+    let store = RecoveryStore()
+    let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    do {
+        switch action {
+        case "save":
+            let runtime = try runner.collector.collect()
+            let registry = try store.exclusively { () throws -> RecoveryRegistry in
+                let (registry, _) = Recovery.merge(store.load(), runtime: runtime, seen: [], now: RecoveryRunner.timestamp())
+                try store.save(registry)
+                return registry
+            }
+            FileHandle.standardOutput.write(Data("saved \(registry.roles.count) agents to \(store.url.path)\n".utf8))
+        default:
+            let report = try store.exclusively { action == "restore" ? try runner.restore(store.load()) : try runner.check(store.load()) }
+            FileHandle.standardOutput.write(try encoder.encode(report)); FileHandle.standardOutput.write(Data([10]))
+            exit(report.ready ? 0 : 2)
+        }
+    } catch {
+        FileHandle.standardError.write(Data("\(error)\n".utf8)); exit(1)
+    }
+    exit(0)
+}
 if CommandLine.arguments.dropFirst().first == "--lineage" {
     var output: [String:Any] = ["recorded":false,"error":"invalid"]
     do {
