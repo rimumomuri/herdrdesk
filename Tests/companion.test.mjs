@@ -142,3 +142,12 @@ test('hover sets the direction first and shows the panel only when asked', async
   assert.match(page, /direction\(right, down\)/);
   assert.match(page, /reveal\(on\)/);
 });
+
+test('the stat panel window shows only the panel, beside the sheep', async () => {
+  const {readFileSync} = await import('node:fs');
+  const css = readFileSync(new URL('../Resources/web/companion.css', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('../Resources/web/companion-page.js', import.meta.url), 'utf8');
+  assert.match(page, /location\.hash === '#panel'/);
+  assert.match(css, /\.companion\.panel-only \.companion-figure \{ display:none \}/);
+  assert.match(css, /\.companion\.panel-only \.companion-bubble \{ display:block/);
+});

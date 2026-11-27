@@ -61,3 +61,8 @@ body.companion-body { display:block; min-height:0; min-width:0 }
 .stat-section[data-kind=waiting] .stat-row span { color:#ffd59c }
 @keyframes stat-breathe { 50% { opacity:.35 } }
 @media(prefers-reduced-motion:reduce) { .stat-section[data-kind=working] .stat-dot { animation:none } }
+/* The stat panel's own window: no sheep, the panel always shown, hugging the side where the sheep's window sits. */
+.companion.panel-only .companion-figure { display:none }
+.companion.panel-only .companion-bubble { display:block; right:4px; animation:none }
+.companion.panel-only.bubble-right .companion-bubble { left:4px; right:auto }
+.companion.panel-only .companion-bubble:empty { display:none!important }

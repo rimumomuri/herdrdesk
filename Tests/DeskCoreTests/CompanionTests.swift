@@ -141,6 +141,23 @@ final class CompanionFitTests: XCTestCase {
     }
 }
 
+final class CompanionBubbleWindowTests: XCTestCase {
+    func testThePanelWindowSitsBesideTheSheepWithoutCoveringIt() {
+        let screen = CGRect(x: 0, y: 0, width: 1440, height: 875)
+        let sheep = CGRect(x: 1300, y: 100, width: 84, height: 84)
+        let left = CompanionLayout.bubbleFrame(sheep: sheep, screens: [screen], height: 200)
+        XCTAssertEqual(left.frame.maxX, sheep.minX)
+        XCTAssertEqual(left.frame.width, CompanionLayout.wide - CompanionLayout.side)
+        XCTAssertEqual(left.frame.minY, 100)                 // grows up from the sheep's bottom
+        XCTAssertEqual(left.frame.height, 200)
+        XCTAssertFalse(left.right); XCTAssertFalse(left.down)
+        let edge = CompanionLayout.bubbleFrame(sheep: CGRect(x: 20, y: 767, width: 84, height: 84), screens: [screen], height: 200)
+        XCTAssertEqual(edge.frame.minX, 104)                 // opens to the right of a sheep at the left edge
+        XCTAssertEqual(edge.frame.maxY, 851)                 // and down from a sheep at the top
+        XCTAssertTrue(edge.right); XCTAssertTrue(edge.down)
+    }
+}
+
 final class CompanionDragTests: XCTestCase {
     func testASmallWiggleIsAClickNotADrag() {
         var drag = CompanionDrag()
