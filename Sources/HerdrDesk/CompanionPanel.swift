@@ -213,7 +213,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         let lines = (state?["lines"] as? [String]) ?? []
         let want = (overSheep || overBubble) && !carrying && panel.isVisible && (!stats.isEmpty || !lines.isEmpty)
         if !want {
-            guard bubbleOpen else { return }
+            guard bubbleOpen else { bubbleToken += 1; return }   // an open still waiting on the page is dropped
             if carrying || !panel.isVisible { closeBubble(); return }
             closeTimer?.invalidate()
             closeTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: false) { [weak self] _ in self?.closeBubble() }
@@ -228,7 +228,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         bubbleToken += 1
         let token = bubbleToken
         let show = { [weak self] in
-            guard let self, self.bubbleToken == token else { return }
+            guard let self, self.bubbleToken == token, (self.overSheep || self.overBubble), !self.carrying, self.panel.isVisible else { return }
             if self.bubble.frame != place.frame { self.bubble.setFrame(place.frame, display: true) }
             if !self.bubble.isVisible { self.bubble.orderFrontRegardless() }
             self.bubbleOpen = true
