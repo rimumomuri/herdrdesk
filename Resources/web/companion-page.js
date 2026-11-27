@@ -45,8 +45,10 @@ window.companion = {
     flash.innerHTML = state.flash === 'handoff' ? ARROW : state.flash ? CHECK : '';
     // the stat panel when there is something to list, else the short lines
     const stats = state.stats || [];
-    document.getElementById('companionBubble').innerHTML = stats.length ? statPanelHTML(stats)
-      : (state.lines || []).slice(0, 4).map(line => '<div>' + escapeText(line) + '</div>').join('');
+    const lineHTML = (state.lines || []).slice(0, 4).map(line => '<div>' + escapeText(line) + '</div>').join('');
+    // an offline or usage-limit notice stays above the panel; otherwise the panel replaces the short lines
+    document.getElementById('companionBubble').innerHTML = !stats.length ? lineHTML
+      : (['offline', 'limit'].includes(state.mood) ? '<div class="stat-notice">' + lineHTML + '</div>' : '') + statPanelHTML(stats);
     if (state.mood === 'attention') {
       if (moodChanged || state.count > (current?.count || 0)) nudge();
       nudgeTimer ??= setInterval(nudge, NUDGE_EVERY);

@@ -169,7 +169,9 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         let stats = state?["stats"] as? [[String: Any]] ?? []
         if on && (!stats.isEmpty || !((state?["lines"] as? [String])?.isEmpty ?? true)) {
             let rows = stats.map { (($0["rows"] as? [Any])?.count ?? 0) + ((($0["more"] as? String) ?? "").isEmpty ? 0 : 1) }
-            let open = CompanionLayout.expanded(sheep: sheep, screens: Self.screens(), height: CompanionLayout.panelHeight(sections: rows))
+            let mood = state?["mood"] as? String ?? ""
+            let notices = ["offline", "limit"].contains(mood) ? ((state?["lines"] as? [String])?.count ?? 0) : 0
+            let open = CompanionLayout.expanded(sheep: sheep, screens: Self.screens(), height: CompanionLayout.panelHeight(sections: rows, lines: notices))
             bubbleRight = open.bubbleRight
             bubbleDown = open.down
             panel.setFrame(open.frame, display: true)
