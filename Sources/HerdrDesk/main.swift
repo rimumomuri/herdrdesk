@@ -129,6 +129,9 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
     private var recoverySignature = ""
     private var recoveryTurns = ""
     private var recoveryChecked = -1       // the connection generation whose first check ran
+    /// Bumped whenever Core goes away; a save started before that writes nothing.
+    private let recoveryEpochBox = RecoveryEpoch()
+    private var recoveryEpoch: Int { recoveryEpochBox.value }
     private var recoveryLastSave = Date.distantPast
     private var recoverySave: DispatchWorkItem?
     private var recoveryBusy = ""          // "", "checking", "restoring"
@@ -221,6 +224,13 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                 }
             }
             if state == "live" { self.scheduleInventory(); self.scheduleRecoverySave(native) }
+            else {
+                // Core went away (it may come back rebooted): what was seen before no longer proves a deliberate close.
+                self.recoverySeen = []
+                self.recoveryEpochBox.bump()
+                self.recoveryChecked = -1
+                self.recoverySignature = ""
+            }
             if !self.isolated && self.automaticChat { self.liveChat.track(state == "live" ? native : []) }
             self.observeHandoffs()
             self.push()
@@ -716,7 +726,7 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
         recoverySave = nil
         guard connection == "live", let runner = recoveryRunner() else { return }
         guard recoveryBusy.isEmpty else { retryRecoverySave(after: 15); return }
-        let current = generation, seen = recoverySeen, store = recoveryStore
+        let current = generation, epoch = recoveryEpoch, seen = recoverySeen, store = recoveryStore
         recoveryLastSave = Date()
         recoveryQueue.async {
             guard let runtime = try? runner.collector.collect() else {
@@ -725,13 +735,14 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
             }
             let (registry, seenNow) = Recovery.merge(store.load(), runtime: runtime, seen: seen, now: RecoveryRunner.timestamp())
             var saved = registry, failure = ""
+            guard self.recoveryEpochBox.value == epoch else { return }   // Core went away meanwhile
             if registry != store.load() {
                 do { try store.save(registry) } catch { saved = store.load(); failure = "the recovery list could not be saved: \(error)" }
             }
             // The sidebar follows what runs now (a resume that finished starting, a shell left by a reboot).
             let report = runner.check(saved, runtime: runtime)
             DispatchQueue.main.async {
-                guard self.generation == current else { return }
+                guard self.generation == current, self.recoveryEpoch == epoch else { return }
                 self.recoverySeen = seenNow
                 self.recoverySaved = saved
                 if !failure.isEmpty { self.recoveryError = String(failure.prefix(300)) }
@@ -1171,6 +1182,14 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
             }
         }
     }
+}
+
+/// A counter read from the recovery queue and bumped on the main thread.
+final class RecoveryEpoch: @unchecked Sendable {
+    private let lock = NSLock()
+    private var current = 0
+    var value: Int { lock.lock(); defer { lock.unlock() }; return current }
+    func bump() { lock.lock(); current += 1; lock.unlock() }
 }
 
 if CommandLine.arguments.dropFirst().first == "--recovery" {

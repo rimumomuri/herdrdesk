@@ -280,4 +280,12 @@ final class RecoveryTests: XCTestCase {
         XCTAssertTrue(Recovery.bypass(["/bin/zsh", "-lic", "exec /bin/zsh -lic 'cd -- /Users/me && exec codex --no-daemon --dangerously-bypass-approvals-and-sandbox resume x '\"'\"'msg'\"'\"''"]))
         XCTAssertTrue(Recovery.bypass(["node", "/usr/local/bin/claude", "--dangerously-skip-permissions", "--resume", "x"]))
     }
+
+    func testASavedLeadIsKeptWhileTheLeadIsStillStarting() {
+        let lead = role("lead", sid: other), worker = role("worker", parent: "lead")
+        let before = RecoveryRegistry(roles: [lead, worker], savedAt: "t0")
+        let runningWorker = agentTerm("t2", role: "worker")              // started without a parent
+        let (saved, _) = Recovery.merge(before, runtime: RecoveryRuntime(terminals: [runningWorker]), seen: [], now: "t2")
+        XCTAssertEqual(saved.roles.first { $0.key == "worker" }?.parentRole, "lead")
+    }
 }
