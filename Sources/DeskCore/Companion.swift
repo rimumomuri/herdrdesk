@@ -16,6 +16,10 @@ public enum CompanionLayout {
         return true
     }
 
+    /// HerdrDesk counts as in front only while it is active and its window is open; with the window closed (the app
+    /// keeps running) the companion shows, as when the app is in the background.
+    public static func deskInFront(appActive: Bool, windowVisible: Bool) -> Bool { appActive && windowVisible }
+
     /// The saved place when the whole sheep fits on one screen, else the main screen's top-right corner.
     /// `screens` are visible frames, the main screen first.
     public static func origin(saved: CGPoint?, screens: [CGRect]) -> CGPoint {
