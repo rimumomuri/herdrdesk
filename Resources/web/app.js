@@ -1638,15 +1638,6 @@ function renderChatContext(term,room) {
   const head=approvalHeadHTML(Math.max(1,requests.length),copy);
   const typing=approval.contains(document.activeElement)&&document.activeElement.matches('textarea')
     &&keepTyping(requests,document.activeElement.closest('[data-question]')?.dataset.question,snapshot.connection==='live',questionSending);
-  // The top list leaves out exactly what these cards show; redraw it when that changes (switching chats too).
-  const shownQuestions=page==='conversations'?requests.map(q=>q.id):[];
-  const shownBlocked=page==='conversations'&&!request&&!troubled&&waiting?[waiting.address]:[];
-  const shownKey=shownQuestions.join(',')+'|'+shownBlocked.join(',');
-  if(shownKey!==inlineWaitingKey){
-    inlineWaitingKey=shownKey;
-    inlineWaiting={questions:new Set(shownQuestions),blocked:new Set(shownBlocked)};
-    renderWaitingInbox();
-  }
   if(request){
     if(!typing&&setPanel('#inlineApproval',head+'<div class="chat-questions">'+requests.map(questionHTML).join('')+'</div>'))
       enterFresh(approval,'questions','data-question',POP,160);
@@ -1659,6 +1650,16 @@ function renderChatContext(term,room) {
   }else if(waiting){
     setPanel('#inlineApproval',head+'<div class="chat-approval"><strong>'+escape(copy('due')+' · '+waiting.label)
       +'</strong><button type="button" data-waiting-terminal="'+escape(sessionKey(waiting))+'">'+copy('terminal')+'</button></div>');
+  }
+  // The top list leaves out exactly the cards rendered here (read back from the page, so a card not yet drawn while
+  // someone types stays in the list); redraw it when that changes, switching chats too.
+  const shownQuestions=page==='conversations'&&request?[...approval.querySelectorAll('[data-question]')].map(node=>node.dataset.question):[];
+  const shownBlocked=page==='conversations'&&!request&&!troubled&&waiting?[waiting.address]:[];
+  const shownKey=shownQuestions.join(',')+'|'+shownBlocked.join(',');
+  if(shownKey!==inlineWaitingKey){
+    inlineWaitingKey=shownKey;
+    inlineWaiting={questions:new Set(shownQuestions),blocked:new Set(shownBlocked)};
+    renderWaitingInbox();
   }
   roomCurrentKey=currentKey;
   previousInlineHandoff=latest?.id||'';
