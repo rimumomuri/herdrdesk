@@ -385,6 +385,20 @@ main[data-page=conversations] .identity { min-height:38px }
 .chat-kind { display:inline-block; margin-left:4px; padding:1px 8px; border-radius:6px; font-size:11px; font-weight:650; vertical-align:2px; background:#33323a; color:#c9c7d1 }
 .chat-kind[data-kind=team] { background:color-mix(in srgb,var(--chat-c) 30%,transparent); color:#f1edff }
 main[data-page=conversations][data-chat-kind=team] .detail .identity { background:color-mix(in srgb,var(--chat-c) 13%,transparent); border-radius:12px; padding:8px 10px }
+/* The header also tells where the conversation stands: green while it works, orange while it waits on you. */
+main[data-page=conversations] .detail .identity { transition:background-color .35s ease }
+main[data-page=conversations][data-chat-state=working] .detail .identity { background:color-mix(in srgb,#3ccf7e 15%,transparent); border-radius:12px; padding:8px 10px; animation:chat-state-breathe 2.8s ease-in-out infinite }
+@keyframes chat-state-breathe { 0%,100% { background-color:color-mix(in srgb,#3ccf7e 9%,transparent) } 50% { background-color:color-mix(in srgb,#3ccf7e 24%,transparent) } }
+main[data-page=conversations][data-chat-state=answer] .detail .identity { background:color-mix(in srgb,#f0a23a 17%,transparent); border-radius:12px; padding:8px 10px }
+.chat-state-chip { display:inline-flex; align-items:center; gap:5px; margin-left:6px; padding:1px 8px; border-radius:999px; font-size:11px; font-weight:650; vertical-align:2px }
+main[data-page=conversations] #targetTitle { display:inline }
+.chat-state-chip[hidden] { display:none }
+.chat-state-chip::before { content:""; width:7px; height:7px; border-radius:50%; background:currentColor }
+.chat-state-chip[data-state=working] { color:#6be3a0; background:color-mix(in srgb,#3ccf7e 20%,transparent) }
+.chat-state-chip[data-state=working]::before { animation:chat-state-pulse 1.4s ease-in-out infinite }
+.chat-state-chip[data-state=answer] { color:#ffc271; background:color-mix(in srgb,#f0a23a 24%,transparent) }
+@keyframes chat-state-pulse { 50% { opacity:.3 } }
+@media (prefers-reduced-motion:reduce) { .chat-state-chip[data-state=working]::before, main[data-page=conversations][data-chat-state=working] .detail .identity { animation:none } }
 .composer-target { display:none; align-items:center; gap:6px; margin:0; font-size:11.5px; color:var(--muted) }
 main[data-page=conversations]:is([data-chat-kind=team],[data-chat-kind=direct]) .composer-target { display:flex }
 main[data-page=conversations][data-chat-kind=team] .composer-target { color:color-mix(in srgb,var(--chat-c) 45%,#fff) }
@@ -751,7 +765,7 @@ main[data-page=conversations] .terminal-drawer-head {
 .terminal-drawer-head span { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--muted); font-size:11px }
 #chat { position:relative }
 /* What waits on the person floats over the top of the chat, so the conversation never shifts under it. */
-#inlineApproval { position:absolute; top:6px; left:10px; right:10px; z-index:6; max-height:60%; overflow:auto;
+#inlineApproval { position:absolute; top:6px; left:10px; right:10px; z-index:3; max-height:60%; overflow:auto;
   padding:6px 8px 8px; border:1px solid #6b5a3a; border-radius:10px; background:var(--panel);
   box-shadow:0 10px 28px rgba(0,0,0,.45) }
 #inlineApproval[hidden], #approvalPill[hidden] { display:none }
@@ -759,7 +773,7 @@ main[data-page=conversations] .terminal-drawer-head {
   margin:-6px -8px 4px; padding:6px 8px; background:inherit; color:var(--warn); font-size:12px }
 .approval-head button { font-size:11px }
 .approval-count { color:var(--warn) }
-#approvalPill { position:absolute; top:6px; left:50%; transform:translateX(-50%); z-index:6; font-size:11px; padding:4px 10px; border-radius:999px;
+#approvalPill { position:absolute; top:6px; left:50%; transform:translateX(-50%); z-index:3; font-size:11px; padding:4px 10px; border-radius:999px;
   border:1px solid #6b5a3a; color:var(--warn); background:var(--panel); box-shadow:0 4px 14px rgba(0,0,0,.35) }
 .chat-questions { display:grid; gap:6px; margin:4px 0 }
 .chat-question { padding:8px 10px; border:1px solid #484033; border-radius:8px; background:var(--panel, transparent) }

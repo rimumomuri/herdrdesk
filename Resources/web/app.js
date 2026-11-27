@@ -18,7 +18,7 @@ import { companionState, companionSummary, featuredAgent } from './companion.js'
 import { agentTrouble, machineTrouble } from './trouble.js';
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest, mainMachineLabel } from './computers.js';
 import { boardColumns, teamCounts, boardCardHTML, teamCountsText, boardSummaryHTML, BOARD_LABELS } from './task-board.js';
-import { questionFormHTML, questionFilesHTML, keepTyping, approvalSignature, approvalDock, approvalHeadHTML, keepHidden } from './chat-questions.js';
+import { questionFormHTML, questionFilesHTML, keepTyping, approvalSignature, approvalDock, approvalHeadHTML, keepHidden, headerState } from './chat-questions.js';
 import { attentionOf, autoUnread, markSeen, snoozeActive, snoozeUntil, nextUrgent, waitingCount } from './triage.js';
 import { filterPalette, paletteHTML } from './palette.js';
 import { sendBlocked, deferredSaver } from './composer.js';
@@ -1616,6 +1616,15 @@ function renderChatContext(term,room) {
   const troubleKind=troubled?agentTrouble(troubled):'';
   approvalCurrent=page==='conversations'?approvalSignature({requests,troubled:troubled&&sessionKey(troubled),kind:troubleKind,waiting:waiting&&sessionKey(waiting)}):'';
   approvalHidden=keepHidden(approvalCurrent,approvalHidden);
+  // The header's color says where the conversation stands: orange while it waits on you, green while it works.
+  const chatState=page==='conversations'?headerState({waiting:Boolean(approvalCurrent),
+    working:[term,...(room?.members||[])].some(member=>member?.state==='live'&&busyNow(member))}):'';
+  document.querySelector('main').dataset.chatState=chatState;
+  const chip=$('#chatStateChip');
+  chip.hidden=!chatState;
+  const chipText=chatState?copy(chatState==='answer'?'approvalWaitingTitle':'working'):'';
+  if(chip.textContent!==chipText)chip.textContent=chipText;
+  chip.dataset.state=chatState;
   const dock=approvalDock(approvalCurrent,approvalHidden);
   approval.hidden=!dock.popup;
   const pill=$('#approvalPill');

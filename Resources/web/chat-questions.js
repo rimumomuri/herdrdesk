@@ -61,3 +61,6 @@ export function approvalHeadHTML(count, copy) {
 
 /** A hidden popup's mark is dropped as soon as something else (or nothing) waits, so a later wait shows again. */
 export const keepHidden = (signature, hidden) => hidden && hidden === signature ? hidden : null;
+
+/** The conversation header's state color: something waiting on the person first, then work in progress, else none. */
+export const headerState = ({ waiting = false, working = false } = {}) => waiting ? 'answer' : working ? 'working' : '';

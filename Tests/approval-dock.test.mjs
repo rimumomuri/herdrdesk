@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {approvalSignature, approvalDock, approvalHeadHTML, keepHidden} from '../Resources/web/chat-questions.js';
+import {approvalSignature, approvalDock, approvalHeadHTML, keepHidden, headerState} from '../Resources/web/chat-questions.js';
 
 const copy = key => ({approvalWaitingTitle:'답변 대기', approvalHide:'숨기기', approvalShow:'다시 보기'})[key] || key;
 
@@ -58,4 +58,25 @@ test('hiding lasts only while the same item waits: once it clears, a later wait 
   assert.equal(hidden, null);
   assert.deepEqual(approvalDock('waiting:s1', hidden), {popup:true, pill:false});
   assert.equal(keepHidden('waiting:s2', 'waiting:s1'), null);
+});
+
+test('the header color follows the conversation: waiting on you beats working, and done goes back to normal', () => {
+  assert.equal(headerState({waiting:true, working:true}), 'answer');
+  assert.equal(headerState({waiting:false, working:true}), 'working');
+  assert.equal(headerState({waiting:false, working:false}), '');
+});
+
+test('the header has a green working look and an orange answer look, each with a state chip', () => {
+  const css = readFileSync(new URL('../Resources/web/app.css', import.meta.url), 'utf8');
+  assert.match(css, /\[data-chat-state=working\] \.detail \.identity \{[^}]*background/);
+  assert.match(css, /\[data-chat-state=answer\] \.detail \.identity \{[^}]*background/);
+  const html = readFileSync(new URL('../Resources/web/index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="chatStateChip"/);
+});
+
+test('a working header breathes, unless the person asked for less motion', () => {
+  const css = readFileSync(new URL('../Resources/web/app.css', import.meta.url), 'utf8');
+  assert.match(css, /\[data-chat-state=working\] \.detail \.identity \{[^}]*animation:chat-state-breathe/);
+  assert.match(css, /@keyframes chat-state-breathe/);
+  assert.match(css, /prefers-reduced-motion:reduce\) \{[^}]*\[data-chat-state=working\] \.detail \.identity \{ animation:none/);
 });
