@@ -73,7 +73,7 @@ final class RecoveryProbeTests: XCTestCase {
             case "machine": return ok(#"{"machines":[]}"#)
             case "get":
                 if args[1] == "t1" { return ok(#"{"cwd":"/Users/me","labels":{"recovery.role":"shop-lead","team.id":"shop"},"foreground":{"pid":101},"argv":["/bin/zsh"]}"#) }
-                return ok("{\"cwd\":\"/Users/me\",\"labels\":{\"recovery.role\":\"shop-lead\",\"recovery.launching\":\"\(sid)\"},\"foreground\":{\"pid\":202,\"cwd\":\"/Users/me/shop\"},\"argv\":[\"/bin/zsh\"]}")
+                return ok("{\"cwd\":\"/Users/me\",\"labels\":{\"recovery.role\":\"shop-lead\",\"recovery.launching\":\"\(sid)\"},\"foreground\":{\"pid\":202,\"cwd\":\"/Users/me/shop\",\"argv\":[\"node\",\"codex\",\"--dangerously-bypass-approvals-and-sandbox\"]},\"argv\":[\"/bin/zsh\"]}")
             case "exec":
                 let script = args.last ?? ""
                 if script == RecoveryProbe.processScript { return ok("101 1 zsh\n202 1 codex\n") }
@@ -145,5 +145,11 @@ final class RecoveryProbeTests: XCTestCase {
         let resumed = try RecoveryCollector(hc: core, app: nil).collect()
         XCTAssertEqual(runtime.terminal("t1")?.cwd, "/Users/me")
         XCTAssertEqual(resumed.terminal("t9")?.cwd, "/Users/me/shop")
+    }
+
+    func testPermissionFlagsComeFromTheRunningAgent() throws {
+        let core = FakeCore(sid: sid); core.resumed = true
+        let runtime = try RecoveryCollector(hc: core, app: nil).collect()
+        XCTAssertTrue(Recovery.bypass(runtime.terminal("t9")?.argv ?? []))
     }
 }

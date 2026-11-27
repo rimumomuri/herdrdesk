@@ -692,13 +692,25 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }
 
+    /// Tries the save again later (it was skipped during a check or could not collect).
+    private func retryRecoverySave(after delay: TimeInterval) {
+        guard recoverySave == nil else { return }
+        let item = DispatchWorkItem { [weak self] in self?.saveRecovery() }
+        recoverySave = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+    }
+
     private func saveRecovery() {
         recoverySave = nil
-        guard recoveryBusy.isEmpty, connection == "live", let runner = recoveryRunner() else { return }
+        guard connection == "live", let runner = recoveryRunner() else { return }
+        guard recoveryBusy.isEmpty else { retryRecoverySave(after: 15); return }
         let current = generation, seen = recoverySeen, store = recoveryStore
         recoveryLastSave = Date()
         recoveryQueue.async {
-            guard let runtime = try? runner.collector.collect() else { return }
+            guard let runtime = try? runner.collector.collect() else {
+                DispatchQueue.main.async { if self.generation == current { self.retryRecoverySave(after: 30) } }
+                return
+            }
             let (registry, seenNow) = Recovery.merge(store.load(), runtime: runtime, seen: seen, now: RecoveryRunner.timestamp())
             var saved = registry, failure = ""
             if registry != store.load() {
@@ -738,7 +750,8 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                 self.recoveryError = failure
                 if let report { self.recoveryReport = report }
                 self.push()
-                if restore { self.recoverySignature = ""; self.scheduleRecoverySave(self.candidates) }
+                self.recoverySignature = ""      // save (and refresh the sidebar) again from what runs now
+                self.scheduleRecoverySave(self.candidates)
             }
         }
     }
