@@ -271,4 +271,13 @@ final class RecoveryTests: XCTestCase {
         let (saved, _) = Recovery.merge(before, runtime: RecoveryRuntime(terminals: [agentTerm("t1", role: "new-name")]), seen: ["old-name"], now: "t2")
         XCTAssertEqual(saved.roles.map(\.key), ["new-name"])
     }
+
+    func testAFlagNamedOnlyInThePromptIsNotABypass() {
+        XCTAssertFalse(Recovery.bypass(["codex", "resume", "x", "Review the --dangerously-bypass-approvals-and-sandbox flag; do not enable it"]))
+        XCTAssertFalse(Recovery.bypass(["/bin/zsh", "-lic", "exec codex 'mention --dangerously-skip-permissions here'"]))
+        XCTAssertTrue(Recovery.bypass(["/bin/zsh", "-lic", "exec codex --dangerously-bypass-approvals-and-sandbox resume x 'hi'"]))
+        // our own resume, wrapped twice
+        XCTAssertTrue(Recovery.bypass(["/bin/zsh", "-lic", "exec /bin/zsh -lic 'cd -- /Users/me && exec codex --no-daemon --dangerously-bypass-approvals-and-sandbox resume x '\"'\"'msg'\"'\"''"]))
+        XCTAssertTrue(Recovery.bypass(["node", "/usr/local/bin/claude", "--dangerously-skip-permissions", "--resume", "x"]))
+    }
 }

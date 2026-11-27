@@ -113,9 +113,57 @@ public enum Recovery {
         return !(labels["task.spawned"] ?? "").isEmpty && !teamRole.isEmpty && teamRole != "lead"
     }
 
-    /// Whether the running command skipped approval prompts (so the resume does the same).
+    /// Whether the running command skipped approval prompts (so the resume does the same). Only real options count:
+    /// the words of a shell's `-c` command are read as a shell would split them, and a prompt that merely names a flag
+    /// stays one argument and never matches.
     public static func bypass(_ argv: [String]) -> Bool {
-        argv.contains { $0.contains("--dangerously-bypass-approvals-and-sandbox") || $0.contains("--dangerously-skip-permissions") }
+        let flags: Set<String> = ["--dangerously-bypass-approvals-and-sandbox", "--dangerously-skip-permissions"]
+        return !options(argv, depth: 0).isDisjoint(with: flags)
+    }
+
+    static func options(_ argv: [String], depth: Int) -> Set<String> {
+        var result = Set<String>()
+        var index = 0
+        while index < argv.count {
+            let word = argv[index]
+            let shellCommand = word.range(of: #"^-[a-z]*c[a-z]*$"#, options: .regularExpression) != nil
+                && index > 0 && shells.contains(URL(fileURLWithPath: argv[index - 1]).lastPathComponent)
+            if shellCommand, index + 1 < argv.count, depth < 4 {
+                result.formUnion(options(shellWords(argv[index + 1]), depth: depth + 1))
+                index += 2
+                continue
+            }
+            result.insert(word)
+            index += 1
+        }
+        return result
+    }
+
+    /// Splits a command line the way sh does for quotes and backslashes (no expansion).
+    static func shellWords(_ line: String) -> [String] {
+        var words: [String] = [], current = "", inWord = false
+        var chars = Array(line)[...]
+        while let c = chars.popFirst() {
+            switch c {
+            case "'":
+                inWord = true
+                while let q = chars.popFirst(), q != "'" { current.append(q) }
+            case "\"":
+                inWord = true
+                while let q = chars.popFirst(), q != "\"" {
+                    if q == "\\", let next = chars.popFirst() { current.append(next) } else { current.append(q) }
+                }
+            case "\\":
+                inWord = true
+                if let next = chars.popFirst() { current.append(next) }
+            case " ", "\t", "\n", ";", "&", "|":
+                if inWord { words.append(current); current = ""; inWord = false }
+            default:
+                inWord = true; current.append(c)
+            }
+        }
+        if inWord { words.append(current) }
+        return words
     }
 
     /// What to do with a saved role, given the terminal that holds it now (same rules as herdr-recover).

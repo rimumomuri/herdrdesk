@@ -266,8 +266,10 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                 guard self.generation == current else { return }
                 self.inventoryBusy = false
                 self.lastInventory = Date()
+                let reconnected = Desk.machineStates(self.machines) != Desk.machineStates(machines)
                 self.machines = machines
                 self.spaces = spaces
+                if reconnected { self.scheduleRecoverySave(self.candidates) }   // a computer came back: check what it holds
                 self.push()
             }
         }
@@ -666,6 +668,10 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
 
     // MARK: agent recovery
 
+    static func machineStates(_ list: [[String: Any]]) -> String {
+        list.map { (($0["name"] as? String) ?? "") + "=" + (($0["state"] as? String) ?? "") }.sorted().joined(separator: ",")
+    }
+
     private func recoveryRunner() -> RecoveryRunner? {
         guard let executable else { return nil }
         let locale = preferences.string(forKey: "displayLocale").map { String($0.prefix(2)) } ?? "en"
@@ -677,7 +683,13 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
     private func scheduleRecoverySave(_ native: [Term]) {
         guard recoveryEnabled else { return }
         let agents = native.filter { $0.isAgent && $0.state == "live" }
-        let signature = agents.map { $0.address + ":" + $0.session + ":" + ($0.app ?? "") + ":" + Recovery.labelSignature($0.labels) }.sorted().joined(separator: "|")
+        // Agents, plus terminals carrying a role (a shell a reboot left behind), plus which computers are connected.
+        let watched = native.filter { $0.state == "live" && ($0.isAgent || !($0.role ?? "").isEmpty) }
+        let rows: [String] = watched.map { term in
+            let app: String = term.app ?? ""
+            return term.address + ":" + term.session + ":" + app + ":" + Recovery.labelSignature(term.labels)
+        }
+        let signature: String = rows.sorted().joined(separator: "|") + "#" + Desk.machineStates(machines)
         let turns = agents.map { $0.address + ":" + String($0.turn) }.sorted().joined(separator: "|")
         guard let delay = Recovery.saveDelay(checked: recoveryChecked == generation, structural: signature != recoverySignature,
                                              turns: turns != recoveryTurns, sinceLast: Date().timeIntervalSince(recoveryLastSave)) else { return }
