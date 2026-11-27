@@ -122,3 +122,23 @@ test('the stat panel draws each section with its count, rows and times, escaping
   assert.match(html, /<span>A&lt;b&gt;<\/span><time>12m 3s<\/time>/);
   assert.match(html, /stat-more">\+5 more/);
 });
+
+test('the sheep is pinned to a corner of the window, so resizing for the panel never moves it', async () => {
+  const {readFileSync} = await import('node:fs');
+  const css = readFileSync(new URL('../Resources/web/companion.css', import.meta.url), 'utf8');
+  const figure = css.match(/\.companion-figure \{[^}]*\}/)[0];
+  assert.match(figure, /position:absolute/);
+  assert.match(figure, /right:10px/);
+  assert.match(figure, /bottom:10px/);
+  assert.match(css, /\.companion\.bubble-right \.companion-figure \{[^}]*left:10px/);
+  assert.match(css, /\.companion\.bubble-down \.companion-figure \{[^}]*top:10px/);
+  // no layout that depends on the hover class or the window height
+  assert.doesNotMatch(css, /\.companion\.hovered \{[^}]*align-items/);
+});
+
+test('hover sets the direction first and shows the panel only when asked', async () => {
+  const {readFileSync} = await import('node:fs');
+  const page = readFileSync(new URL('../Resources/web/companion-page.js', import.meta.url), 'utf8');
+  assert.match(page, /direction\(right, down\)/);
+  assert.match(page, /reveal\(on\)/);
+});

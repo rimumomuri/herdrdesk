@@ -58,9 +58,12 @@ window.companion = {
     }
     current = state;
   },
-  hover(on, right, down) {
-    root.classList.toggle('hovered', !!on);
-    root.classList.toggle('bubble-right', !!(on && right));
-    root.classList.toggle('bubble-down', !!(on && down));
+  /** Which corner the sheep keeps while the window is wider or taller (set before the window grows, cleared after it shrinks). */
+  direction(right, down) {
+    root.classList.toggle('bubble-right', !!right);
+    root.classList.toggle('bubble-down', !!down);
   },
+  /** Shows or hides the panel (after the window has grown, before it shrinks). */
+  reveal(on) { root.classList.toggle('hovered', !!on); },
+  hover(on, right, down) { this.direction(on && right, on && down); this.reveal(on); },
 };
