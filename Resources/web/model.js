@@ -261,3 +261,11 @@ export function modelInUse(options = {}) {
   if (o.defaultModel) return { model: o.defaultModel, effort: o.launchEffort || o.defaultEffort || '', source: 'default' };
   return { model: '', effort: '', source: '' };
 }
+
+/** When an agent finished its turn: the reported turn end when it is newer than the terminal's status change. */
+export function finishedAt(term, runtime) {
+  const status = Number.isFinite(term?.statusMs) ? term.statusMs : null;
+  const end = runtime?.state === 'done' ? Date.parse(runtime.at) : NaN;
+  if (Number.isFinite(end) && (status === null || end >= status)) return end;
+  return status;
+}
