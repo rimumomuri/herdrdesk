@@ -153,3 +153,10 @@ test('the stat panel window shows only the panel, beside the sheep', async () =>
   assert.match(css, /\.companion\.panel-only \.companion-figure \{ display:none \}/);
   assert.match(css, /\.companion\.panel-only \.companion-bubble \{ display:block/);
 });
+
+test('a long name is cut with an ellipsis instead of pushing the count and the time out of the panel', async () => {
+  const {readFileSync} = await import('node:fs');
+  const css = readFileSync(new URL('../Resources/web/companion.css', import.meta.url), 'utf8');
+  assert.match(css, /\.stat-panel \{[^}]*grid-template-columns:minmax\(0, ?1fr\)/);
+  assert.match(css, /\.stat-section \{[^}]*min-width:0/);
+});
