@@ -158,6 +158,14 @@ final class CompanionBubbleWindowTests: XCTestCase {
     }
 }
 
+final class CompanionAwayTests: XCTestCase {
+    func testAClosedWindowCountsAsAwayEvenWhileTheAppIsFrontmost() {
+        XCTAssertTrue(CompanionLayout.deskInFront(appActive: true, windowVisible: true))
+        XCTAssertFalse(CompanionLayout.deskInFront(appActive: true, windowVisible: false))   // window closed with its button
+        XCTAssertFalse(CompanionLayout.deskInFront(appActive: false, windowVisible: true))
+    }
+}
+
 final class CompanionDragTests: XCTestCase {
     func testASmallWiggleIsAClickNotADrag() {
         var drag = CompanionDrag()

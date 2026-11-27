@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 import DeskCore
 import WebKit
 
-final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
+final class Desk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
     private var web: WKWebView!
     private var window: NSWindow!
     private var index: URL!
@@ -153,6 +153,8 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                           backing: .buffered, defer: false)
         window.title = "HerdrDesk"
         window.titleVisibility = .hidden
+        window.isReleasedWhenClosed = false
+        window.delegate = self
         window.minSize = NSSize(width: 380, height: 540)
         window.contentView = web
         if !isolated { window.setFrameAutosaveName("HerdrDeskPublic") }
@@ -171,6 +173,7 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                 NSApp.activate(ignoringOtherApps: true)
                 if self.window.isMiniaturized { self.window.deminiaturize(nil) }
                 self.window.makeKeyAndOrderFront(nil)
+                self.companion?.deskVisibilityChanged()
                 self.call("window.desk.openCompanionTarget()", [:])
             }
             companion.onTurnOff = { [weak self] in self?.call("window.desk.companionOff()", [:]) }
@@ -1104,7 +1107,23 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { ready = false; stopWatch() }
-    func applicationShouldTerminateAfterLastWindowClosed(_ app: NSApplication) -> Bool { true }
+    // The close button hides the window and HerdrDesk keeps running (as Claude and Codex do): the Dock icon or the
+    // floating companion brings it back, and Quit (⌘Q) ends it.
+    func applicationShouldTerminateAfterLastWindowClosed(_ app: NSApplication) -> Bool { false }
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard sender === window else { return true }
+        sender.orderOut(nil)
+        companion?.deskVisibilityChanged()
+        return false
+    }
+    func applicationShouldHandleReopen(_ app: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !window.isVisible {
+            if window.isMiniaturized { window.deminiaturize(nil) }
+            window.makeKeyAndOrderFront(nil)
+            companion?.deskVisibilityChanged()
+        }
+        return true
+    }
     func applicationWillTerminate(_ note: Notification) { stopWatch(); pump?.stop(); liveChat.track([]) }
 
     private func updateMenu(_ locale: String) {

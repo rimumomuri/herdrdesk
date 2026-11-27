@@ -178,13 +178,18 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         if bubbleOpen { layoutBubble() }   // the rows may have changed: fit the panel window to them
     }
 
+    /// The main window was closed or opened again: the companion shows while it is closed.
+    func deskVisibilityChanged() { refresh() }
+
     private func refresh() {
         recheck?.invalidate()
         recheck = nil
         let now = Date()
         if let until = snoozedUntil, until <= now { snoozedUntil = nil }
         let mood = state?["mood"] as? String ?? "idle"
-        let show = pageReady && CompanionLayout.visible(mood: mood, enabled: enabled, attentionOnly: attentionOnly, appActive: NSApp.isActive,
+        let windowOpen = NSApp.windows.contains { $0.isVisible && $0.canBecomeMain }
+        let front = CompanionLayout.deskInFront(appActive: NSApp.isActive, windowVisible: windowOpen)
+        let show = pageReady && CompanionLayout.visible(mood: mood, enabled: enabled, attentionOnly: attentionOnly, appActive: front,
                                                         snoozed: snoozedUntil != nil, idleFor: idleSince.map { now.timeIntervalSince($0) })
         if show {
             if !panel.isVisible { panel.orderFrontRegardless() }
