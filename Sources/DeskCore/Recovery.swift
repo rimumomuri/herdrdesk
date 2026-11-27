@@ -120,11 +120,10 @@ public enum Recovery {
     public static func choose(_ role: RecoveryRole, _ actual: ObservedTerminal?, online: Bool) -> (RecoveryAction, String) {
         guard online else { return (.offline, "machine is not connected; left untouched") }
         guard let actual else { return (.create, "no terminal holds it; resume it in a new terminal") }
+        // A verified match counts as running even while it still carries the launch mark of its own resume.
+        if actual.agent == role.agent, actual.sessionId == role.sessionId { return (.skip, "the same conversation is already running") }
         if actual.launching { return (.pending, "a resume was already started; check its startup screen first") }
-        if let agent = actual.agent {
-            if agent != role.agent || actual.sessionId != role.sessionId { return (.blocked, "a different or unverified conversation runs there") }
-            return (.skip, "the same conversation is already running")
-        }
+        if actual.agent != nil { return (.blocked, "a different or unverified conversation runs there") }
         if actual.shell { return (.resume, "only a shell is left; resume the exact conversation") }
         return (.blocked, "the foreground program is not a plain shell")
     }
@@ -191,6 +190,9 @@ public enum Recovery {
                 roles.append(old)
             } else if runtime.terminals.contains(where: { $0.machine == old.machine && $0.sessionId == old.sessionId }) {
                 roles.append(old)                                             // still running, only not verifiable now
+            } else if runtime.terminals.contains(where: { $0.machine == old.machine && $0.agent != nil && $0.sessionId == nil
+                                                         && ($0.labels[label] == old.key || $0.address == old.lastAddress) }) {
+                roles.append(old)                                             // its agent runs, but its session could not be read
             }
         }
         for (key, found) in byKey.sorted(by: { $0.key < $1.key }) where !handled.contains(key) && found.count == 1 {
@@ -298,5 +300,17 @@ extension RecoveryRole {
         var a = self, b = other
         a.savedAt = ""; b.savedAt = ""
         return a == b
+    }
+}
+
+extension Recovery {
+    /// When to save again: soon after the first look of a connection (even with no agent running, so a reboot is noticed),
+    /// a few seconds after agents start, end or move, and at most once a minute when only their turns advanced (a new
+    /// conversation inside the same agent shows up there). Nil: nothing to do.
+    public static func saveDelay(checked: Bool, structural: Bool, turns: Bool, sinceLast: TimeInterval) -> TimeInterval? {
+        if !checked { return 2 }
+        if structural { return 5 }
+        if turns { return max(5, 60 - sinceLast) }
+        return nil
     }
 }

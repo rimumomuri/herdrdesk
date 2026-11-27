@@ -197,4 +197,26 @@ final class RecoveryTests: XCTestCase {
                                         seen: [], now: "t1")
         XCTAssertEqual(saved.roles.first?.bypass, true)
     }
+
+    // MARK: review fixes
+
+    func testAResumedConversationStillMarkedAsStartingCountsAsRunning() {
+        var term = agentTerm("t9"); term.labels["recovery.launching"] = sid
+        XCTAssertEqual(Recovery.choose(role(), term, online: true).0, .skip)
+    }
+
+    func testARunningAgentWhoseSessionCannotBeReadIsKept() {
+        let before = RecoveryRegistry(roles: [role()], savedAt: "t0")
+        var unverified = agentTerm("t1"); unverified.sessionId = nil
+        let (saved, _) = Recovery.merge(before, runtime: RecoveryRuntime(terminals: [unverified]), seen: ["shop-lead"], now: "t2")
+        XCTAssertEqual(saved, before)
+    }
+
+    func testSavesWaitAfterStructureChangesAndAreSpacedOutForTurns() {
+        XCTAssertEqual(Recovery.saveDelay(checked: false, structural: false, turns: false, sinceLast: 0), 2)
+        XCTAssertEqual(Recovery.saveDelay(checked: true, structural: true, turns: true, sinceLast: 0), 5)
+        XCTAssertEqual(Recovery.saveDelay(checked: true, structural: false, turns: true, sinceLast: 10), 50)
+        XCTAssertEqual(Recovery.saveDelay(checked: true, structural: false, turns: true, sinceLast: 600), 5)
+        XCTAssertNil(Recovery.saveDelay(checked: true, structural: false, turns: false, sinceLast: 0))
+    }
 }

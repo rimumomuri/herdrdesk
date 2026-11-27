@@ -127,9 +127,13 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
     /// Saved roles seen running during this live connection (a role that disappears after that was closed on purpose).
     private var recoverySeen = Set<String>()
     private var recoverySignature = ""
+    private var recoveryTurns = ""
+    private var recoveryChecked = -1       // the connection generation whose first check ran
+    private var recoveryLastSave = Date.distantPast
     private var recoverySave: DispatchWorkItem?
     private var recoveryBusy = ""          // "", "checking", "restoring"
     private var recoveryReport: RecoveryReport?
+    private var recoveryReportGeneration = -1
     private var recoveryError = ""
     private lazy var recoverySaved = recoveryStore.load()
     private var recoveryEnabled: Bool { !isolated }
@@ -185,6 +189,7 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
         liveTurns.removeAll()
         recoverySeen = []
         recoverySignature = ""
+        recoveryTurns = ""
         candidates = []
         spaces = []
         machines = []
@@ -668,24 +673,32 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
         return RecoveryRunner(hc: ProcessHc(path: executable), app: appExecutable.map { ProcessHc(path: $0) }, locale: locale)
     }
 
-    /// Saves again (a few seconds later, in the background) when the set of running agents changes.
+    /// Saves again in the background: after the first look of a connection, when agents start, end or move, and (at most
+    /// once a minute) when their turns advance, which is where a new conversation inside the same agent shows up.
     private func scheduleRecoverySave(_ native: [Term]) {
         guard recoveryEnabled else { return }
-        let signature = native.filter { $0.isAgent && $0.state == "live" }
-            .map { $0.address + ":" + $0.session + ":" + ($0.app ?? "") + ":" + ($0.role ?? "") }.sorted().joined(separator: "|")
-        guard signature != recoverySignature else { return }
+        let agents = native.filter { $0.isAgent && $0.state == "live" }
+        let signature = agents.map { $0.address + ":" + $0.session + ":" + ($0.app ?? "") + ":" + ($0.role ?? "") }.sorted().joined(separator: "|")
+        let turns = agents.map { $0.address + ":" + String($0.turn) }.sorted().joined(separator: "|")
+        guard let delay = Recovery.saveDelay(checked: recoveryChecked == generation, structural: signature != recoverySignature,
+                                             turns: turns != recoveryTurns, sinceLast: Date().timeIntervalSince(recoveryLastSave)) else { return }
+        let structural = signature != recoverySignature || recoveryChecked != generation
         recoverySignature = signature
+        recoveryTurns = turns
+        if !structural, recoverySave != nil { return }      // a save is already on its way
+        recoveryChecked = generation
         recoverySave?.cancel()
         let item = DispatchWorkItem { [weak self] in self?.saveRecovery() }
         recoverySave = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }
 
     private func saveRecovery() {
         recoverySave = nil
         guard recoveryBusy.isEmpty, connection == "live", let runner = recoveryRunner() else { return }
         let current = generation, seen = recoverySeen, store = recoveryStore
-        let firstCheck = recoveryReport == nil
+        let firstCheck = recoveryReport == nil || recoveryReportGeneration != generation
+        recoveryLastSave = Date()
         recoveryQueue.async {
             guard let runtime = try? runner.collector.collect() else { return }
             let (registry, seenNow) = Recovery.merge(store.load(), runtime: runtime, seen: seen, now: RecoveryRunner.timestamp())
@@ -695,7 +708,7 @@ final class Desk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScrip
                 guard self.generation == current else { return }
                 self.recoverySeen.formUnion(seenNow)
                 self.recoverySaved = registry
-                if let report { self.recoveryReport = report }
+                if let report { self.recoveryReport = report; self.recoveryReportGeneration = current }
                 self.push()
             }
         }

@@ -25,7 +25,7 @@ public struct RecoveryProbe {
             let list = ids.sorted().map(String.init).joined(separator: ",")
             lines.append("printf '@codex %s\\n' \(pid); /usr/sbin/lsof -p \(list) -Fn 2>/dev/null | grep '^n.*/\\.codex/sessions/.*\\.jsonl$'")
         }
-        return lines.isEmpty ? "true" : lines.joined(separator: "\n")
+        return (lines + ["true"]).joined(separator: "\n")
     }
 
     /// Codex: the session id on the first line of each open file. Claude: where each conversation file is.
@@ -37,7 +37,7 @@ public struct RecoveryProbe {
         for sid in Set(claudeSessions).sorted() where Recovery.isUUID(sid) {
             lines.append("printf '@sid %s\\n' \(sid); ls -1 \"$HOME\"/.claude/projects/*/\(sid).jsonl 2>/dev/null")
         }
-        return lines.isEmpty ? "true" : lines.joined(separator: "\n")
+        return (lines + ["true"]).joined(separator: "\n")
     }
 
     /// For each role: does its folder exist, does its conversation file exist, and (Codex) does the file carry its id.
@@ -49,7 +49,7 @@ public struct RecoveryProbe {
                 if role.agent == "codex" { line += "; head -n 1 \(quote(file)) | grep -o '\"id\":\"[0-9a-f-]\\{36\\}\"' | head -n 1" }
             }
             return line
-        }.joined(separator: "\n")
+        }.joined(separator: "\n") + "\ntrue"   // a false last test must not hide the other roles' answers
     }
 
     // MARK: parsing

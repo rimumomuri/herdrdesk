@@ -95,7 +95,13 @@ public struct RecoveryRunner {
         }
         let fresh = try collector.collect()
         let retired = retire(registry, runtime: fresh)
-        let final = Recovery.plan(registry, runtime: fresh, valid: collector.validator(for: registry.roles, runtime: fresh))
+        var final = Recovery.plan(registry, runtime: fresh, valid: collector.validator(for: registry.roles, runtime: fresh))
+        // A start that failed keeps its reason, unless the conversation runs now after all.
+        for index in final.indices where final[index].action != .skip {
+            if let attempt = plan.first(where: { $0.key == final[index].key && $0.action == .blocked }) {
+                final[index].action = .blocked; final[index].reason = attempt.reason
+            }
+        }
         return RecoveryReport(at: now(), applied: true, roles: final, ready: final.allSatisfy { $0.action == .skip }, retired: retired)
     }
 

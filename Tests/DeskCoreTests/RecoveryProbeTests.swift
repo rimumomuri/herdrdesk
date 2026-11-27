@@ -60,6 +60,7 @@ final class RecoveryProbeTests: XCTestCase {
     final class FakeCore: HcRunning {
         var calls: [[String]] = []
         var resumed = false
+        var failRun = false
         let sid: String
         init(sid: String) { self.sid = sid }
         func run(_ args: [String], timeout: TimeInterval) -> HcResult {
@@ -72,7 +73,7 @@ final class RecoveryProbeTests: XCTestCase {
             case "machine": return ok(#"{"machines":[]}"#)
             case "get":
                 if args[1] == "t1" { return ok(#"{"cwd":"/Users/me","labels":{"recovery.role":"shop-lead","team.id":"shop"},"foreground":{"pid":101},"argv":["/bin/zsh"]}"#) }
-                return ok(#"{"cwd":"/Users/me/shop","labels":{"recovery.role":"shop-lead"},"foreground":{"pid":202},"argv":["/bin/zsh","-lic","exec codex resume"]}"#)
+                return ok("{\"cwd\":\"/Users/me/shop\",\"labels\":{\"recovery.role\":\"shop-lead\",\"recovery.launching\":\"\(sid)\"},\"foreground\":{\"pid\":202},\"argv\":[\"/bin/zsh\"]}")
             case "exec":
                 let script = args.last ?? ""
                 if script == RecoveryProbe.processScript { return ok("101 1 zsh\n202 1 codex\n") }
@@ -81,6 +82,7 @@ final class RecoveryProbeTests: XCTestCase {
                 if script.contains("@valid") { return ok("@valid 0\ndir\nfile\n\"id\":\"\(sid)\"\n") }
                 return ok("")
             case "run":
+                if failRun { return HcResult(code: 1, out: "", err: "no such space", timedOut: false) }
                 resumed = true
                 return ok(#"{"address":"t9"}"#)
             default: return ok("{}")
@@ -119,5 +121,21 @@ final class RecoveryProbeTests: XCTestCase {
         let mode = try FileManager.default.attributesOfItem(atPath: store.url.path)[.posixPermissions] as? NSNumber
         XCTAssertEqual(mode?.intValue, 0o600)
         try? FileManager.default.removeItem(at: folder)
+    }
+
+    func testScriptsSucceedEvenWhenTheLastCheckIsFalse() {
+        XCTAssertTrue(RecoveryProbe.validateScript([]).hasSuffix("true"))
+        XCTAssertTrue(RecoveryProbe.sessionScript(claude: [1], codex: [:]).hasSuffix("true"))
+        XCTAssertTrue(RecoveryProbe.fileScript(codexFiles: ["/a"], claudeSessions: []).hasSuffix("true"))
+    }
+
+    func testAFailedStartKeepsItsReasonInTheReport() throws {
+        let core = FakeCore(sid: sid); core.failRun = true
+        let role = RecoveryRole(key: "shop-lead", title: "Shop lead", machine: nil, agent: "codex", sessionId: sid,
+                                sessionFile: "/h/.codex/sessions/a.jsonl", cwd: "/Users/me/shop", name: nil, labels: [:],
+                                parentRole: nil, lastAddress: "t1", location: nil, bypass: false, savedAt: "t0")
+        let report = try RecoveryRunner(hc: core, app: nil, locale: "en", now: { "t1" }).restore(RecoveryRegistry(roles: [role]))
+        XCTAssertEqual(report.roles.first?.action, .blocked)
+        XCTAssertTrue(report.roles.first?.reason.contains("no such space") ?? false)
     }
 }
