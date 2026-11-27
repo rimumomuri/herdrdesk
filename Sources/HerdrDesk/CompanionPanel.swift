@@ -142,9 +142,9 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         bubbleContent.addSubview(bubbleHover)
         bubble.contentView = bubbleContent
         bubbleHover.onHover = { [weak self] in self?.overBubble = $0; self?.layoutBubble() }
-        var panelPage = URLComponents(url: page, resolvingAgainstBaseURL: false)
-        panelPage?.fragment = "panel"
-        bubbleWeb.loadFileURL(panelPage?.url ?? page, allowingReadAccessTo: webFolder)
+        // the plain page; once loaded it is switched to panel-only (a URL fragment here made WebKit throw, which cut
+        // the app's launch short before it connected to Herdr)
+        bubbleWeb.loadFileURL(page, allowingReadAccessTo: webFolder)
         let saved = defaults.string(forKey: "companionOrigin").map(NSPointFromString)
         panel.setFrameOrigin(CompanionLayout.origin(saved: saved, screens: Self.screens()))
         web.loadFileURL(page, allowingReadAccessTo: webFolder)
@@ -288,7 +288,14 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
     }
 
     func webView(_ view: WKWebView, didFinish navigation: WKNavigation!) {
-        if view === bubbleWeb { bubbleReady = true } else { pageReady = true }
+        if view === bubbleWeb {
+            view.callAsyncJavaScript("window.companion.panelOnly()", arguments: [:], in: nil, in: .page) { [weak self] _ in
+                self?.bubbleReady = true
+                self?.draw()
+            }
+            return
+        }
+        pageReady = true
         draw()
         refresh()
     }
@@ -297,9 +304,7 @@ final class CompanionPanel: NSObject, WKNavigationDelegate {
         if view === bubbleWeb {
             bubbleReady = false
             closeBubble()
-            var panelPage = URLComponents(url: page, resolvingAgainstBaseURL: false)
-            panelPage?.fragment = "panel"
-            view.loadFileURL(panelPage?.url ?? page, allowingReadAccessTo: page.deletingLastPathComponent())
+            view.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent())
             return
         }
         pageReady = false

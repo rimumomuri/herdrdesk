@@ -147,7 +147,9 @@ test('the stat panel window shows only the panel, beside the sheep', async () =>
   const {readFileSync} = await import('node:fs');
   const css = readFileSync(new URL('../Resources/web/companion.css', import.meta.url), 'utf8');
   const page = readFileSync(new URL('../Resources/web/companion-page.js', import.meta.url), 'utf8');
-  assert.match(page, /location\.hash === '#panel'/);
+  assert.match(page, /panelOnly\(\) \{ root\.classList\.add\('panel-only'\)/);
+  // no URL fragment for the panel window: WebKit refused it and the app never connected
+  assert.doesNotMatch(page, /location\.hash/);
   assert.match(css, /\.companion\.panel-only \.companion-figure \{ display:none \}/);
   assert.match(css, /\.companion\.panel-only \.companion-bubble \{ display:block/);
 });
