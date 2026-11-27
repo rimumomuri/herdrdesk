@@ -125,6 +125,22 @@ final class CompanionStatsTests: XCTestCase {
     }
 }
 
+final class CompanionFitTests: XCTestCase {
+    func testAPanelTallerThanEitherSideStaysOnScreenOnTheRoomierSide() {
+        let screen = CGRect(x: 0, y: 0, width: 1440, height: 640)
+        let open = CompanionLayout.expanded(sheep: CGRect(x: 1300, y: 280, width: 84, height: 84), screens: [screen], height: 500)
+        XCTAssertGreaterThanOrEqual(open.frame.minY, screen.minY)
+        XCTAssertLessThanOrEqual(open.frame.maxY, screen.maxY)
+        XCTAssertTrue(open.down)                           // 360 points above the sheep's bottom, 364 below its top: down wins
+        XCTAssertEqual(open.frame.maxY, 364)
+        XCTAssertEqual(open.frame.height, 364)
+    }
+
+    func testOfflineAndLimitLinesAddToThePanelHeight() {
+        XCTAssertGreaterThan(CompanionLayout.panelHeight(sections: [1], lines: 2), CompanionLayout.panelHeight(sections: [1]))
+    }
+}
+
 final class CompanionDragTests: XCTestCase {
     func testASmallWiggleIsAClickNotADrag() {
         var drag = CompanionDrag()

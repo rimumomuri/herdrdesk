@@ -39,7 +39,8 @@ body.companion-body { display:block; min-height:0; min-width:0 }
    sheep stays where it was, at the bottom (or the top while the panel opens downward). */
 .companion.hovered { align-items:flex-end; padding-bottom:10px }
 .companion.hovered.bubble-down { align-items:flex-start; padding-top:10px; padding-bottom:0 }
-.companion-bubble:has(.stat-panel) { max-width:282px; width:282px; padding:8px 10px; box-sizing:border-box }
+.companion-bubble:has(.stat-panel) { max-width:282px; width:282px; padding:8px 10px; box-sizing:border-box; max-height:calc(100vh - 12px); overflow-y:auto }
+.stat-notice { margin-bottom:6px; padding-bottom:6px; border-bottom:1px solid #ffffff1a; color:#ffd59c }
 .stat-panel { display:grid; gap:7px }
 .stat-section header { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:.02em; color:#d7d7df; margin-bottom:3px }
 .stat-section header b { margin-left:auto; min-width:18px; padding:0 6px; border-radius:9px; text-align:center; font-size:10.5px; line-height:16px; color:#101012 }

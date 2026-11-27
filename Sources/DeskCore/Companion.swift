@@ -28,8 +28,11 @@ public enum CompanionLayout {
     /// when taller than the sheep, up from it (down when up would leave the screen).
     public static func expanded(sheep: CGRect, screens: [CGRect], height: CGFloat? = nil) -> (frame: CGRect, bubbleRight: Bool, down: Bool) {
         let screen = screens.first { $0.intersects(sheep) } ?? screens.first ?? sheep
-        let tall = max(height ?? sheep.height, sheep.height)
-        let down = sheep.minY + tall > screen.maxY
+        let wanted = max(height ?? sheep.height, sheep.height)
+        let above = screen.maxY - sheep.minY, below = sheep.maxY - screen.minY
+        // up when it fits, else down when that fits, else the roomier side, cut to the screen (the panel then scrolls)
+        let down = wanted > above && (wanted <= below || below > above)
+        let tall = max(sheep.height, min(wanted, down ? below : above))
         let y = down ? sheep.maxY - tall : sheep.minY
         let left = CGRect(x: sheep.maxX - wide, y: y, width: wide, height: tall)
         if left.minX >= screen.minX { return (left, false, down) }
@@ -37,9 +40,10 @@ public enum CompanionLayout {
     }
 
     /// Height of the stat panel for sections holding these many rows (title line, rows, a "more" line, padding).
-    public static func panelHeight(sections: [Int]) -> CGFloat {
+    /// `lines`: short notice lines shown above the sections (offline, usage limit).
+    public static func panelHeight(sections: [Int], lines: Int = 0) -> CGFloat {
         guard !sections.isEmpty else { return side }
-        let body = sections.reduce(CGFloat(0)) { $0 + 20 + CGFloat(min($1, 5)) * 19 + 6 }
+        let body = sections.reduce(CGFloat(0)) { $0 + 20 + CGFloat(min($1, 5)) * 19 + 6 } + CGFloat(min(lines, 4)) * 18
         return max(side, body + 22)
     }
 
