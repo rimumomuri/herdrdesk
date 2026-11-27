@@ -39,6 +39,13 @@ public enum CompanionLayout {
         return (CGRect(x: sheep.minX, y: y, width: wide, height: tall), true, down)
     }
 
+    /// The stat panel's own window: the hovered frame without the sheep's column, so the sheep's window never changes size.
+    public static func bubbleFrame(sheep: CGRect, screens: [CGRect], height: CGFloat? = nil) -> (frame: CGRect, right: Bool, down: Bool) {
+        let open = expanded(sheep: sheep, screens: screens, height: height)
+        let x = open.bubbleRight ? sheep.maxX : open.frame.minX
+        return (CGRect(x: x, y: open.frame.minY, width: open.frame.width - side, height: open.frame.height), open.bubbleRight, open.down)
+    }
+
     /// Height of the stat panel for sections holding these many rows (title line, rows, a "more" line, padding).
     /// `lines`: short notice lines shown above the sections (offline, usage limit).
     public static func panelHeight(sections: [Int], lines: Int = 0) -> CGFloat {

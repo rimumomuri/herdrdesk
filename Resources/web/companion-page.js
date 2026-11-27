@@ -16,6 +16,9 @@ function nudge() {
   root.classList.add('nudge');
 }
 
+// The same page draws the stat panel's own window (opened with #panel): there it shows only the panel, always.
+if (location.hash === '#panel') root.classList.add('panel-only');
+
 window.companion = {
   /** state: {mood, count, working, flash, flashAt, lines, face: {provider, kind: lead|agent, mouth: [engine], sleeping, working} | null} */
   show(state) {
