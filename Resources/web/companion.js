@@ -1,5 +1,7 @@
 // The floating sheep: what it should show, from the same signals that drive the sounds. Pure: no DOM, no clock.
 
+import { elapsedText } from './model.js';
+
 export const FLASH_MS = 10_000;
 const OFFLINE = new Set(['lost', 'missing']);
 
@@ -42,4 +44,22 @@ export function featuredAgent({ mood, flash = null, targetKey = null, limitKey =
   if (mood === 'limit' && limitKey) return limitKey;
   if (flash === 'done' && finishedKey) return finishedKey;
   return workingKeys[0] || previousKey || null;
+}
+
+export const STAT_ROWS = 4;
+export const DONE_WINDOW_MS = 30 * 60_000;
+
+/** The hover stat panel: who waits on you, who works and for how long, who finished in the last half hour.
+ *  Input rows carry only a display name and a time; nothing else reaches the companion. Empty sections are left out. */
+export function companionStats({ working = [], done = [], waiting = [] }, now, units, copy) {
+  const section = (kind, title, rows) => rows.length ? [{
+    kind, title, count: rows.length, rows: rows.slice(0, STAT_ROWS),
+    more: rows.length > STAT_ROWS ? copy('statMore').replace('{n}', () => String(rows.length - STAT_ROWS)) : '',
+  }] : [];
+  const ago = at => now - at < 60_000 ? copy('statJustNow') : copy('statAgo').replace('{t}', () => elapsedText(now - at, units).replace(/ \S+$/, ''));
+  return [
+    ...section('waiting', copy('statWaiting'), waiting.map(row => ({ name: row.name, meta: '' }))),
+    ...section('working', copy('statWorking'), [...working].sort((a, b) => a.since - b.since).map(row => ({ name: row.name, meta: elapsedText(now - row.since, units) }))),
+    ...section('done', copy('statDone'), done.filter(row => now - row.at <= DONE_WINDOW_MS).sort((a, b) => b.at - a.at).map(row => ({ name: row.name, meta: ago(row.at) }))),
+  ];
 }

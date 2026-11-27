@@ -79,3 +79,46 @@ test('the floating sheep has no backdrop circle, only a shadow so it reads on an
   assert.doesNotMatch(figure, /border-radius:50%/);
   assert.match(css, /drop-shadow/);
 });
+
+test('the stat panel lists who works (with time), who just finished and who waits on you', async () => {
+  const {companionStats} = await import('../Resources/web/companion.js');
+  const copy = key => ({statWorking: 'Working', statDone: 'Done', statWaiting: 'Waiting on you', statMore: '+{n} more', statJustNow: 'just now', statAgo: '{t} ago'})[key] || key;
+  const units = {s: '{s}s', ms: '{m}m {s}s', hm: '{h}h {m}m'};
+  const now = 10_000_000;
+  const stats = companionStats({
+    working: [{name: 'Kunkun lead', since: now - 723_000}, {name: 'Research', since: now - 130_000}],
+    done: [{name: 'Lime lead', at: now - 20_000}, {name: 'Old', at: now - 3_600_000}],
+    waiting: [{name: 'Realestate lead'}],
+  }, now, units, copy);
+  assert.deepEqual(stats.map(s => s.kind), ['waiting', 'working', 'done']);
+  assert.deepEqual(stats[1].rows, [{name: 'Kunkun lead', meta: '12m 3s'}, {name: 'Research', meta: '2m 10s'}]);
+  assert.equal(stats[1].title, 'Working');
+  assert.equal(stats[1].count, 2);
+  assert.deepEqual(stats[2].rows, [{name: 'Lime lead', meta: 'just now'}]);   // finished over 30 minutes ago drops out
+  assert.deepEqual(stats[0].rows, [{name: 'Realestate lead', meta: ''}]);
+});
+
+test('a long list shows four rows and how many more', async () => {
+  const {companionStats} = await import('../Resources/web/companion.js');
+  const copy = key => ({statWorking: 'Working', statMore: '+{n} more'})[key] || key;
+  const now = 1_000_000;
+  const working = Array.from({length: 6}, (_, i) => ({name: 'A' + i, since: now - 1000}));
+  const [section] = companionStats({working, done: [], waiting: []}, now, {s: '{s}s', ms: '', hm: ''}, copy);
+  assert.equal(section.rows.length, 4);
+  assert.equal(section.more, '+2 more');
+  assert.equal(section.count, 6);
+});
+
+test('nothing going on gives no panel', async () => {
+  const {companionStats} = await import('../Resources/web/companion.js');
+  assert.deepEqual(companionStats({working: [], done: [], waiting: []}, 0, {}, k => k), []);
+});
+
+test('the stat panel draws each section with its count, rows and times, escaping names', async () => {
+  const {statPanelHTML} = await import('../Resources/web/companion-stats.js');
+  const html = statPanelHTML([{kind: 'working', title: 'Working', count: 6, rows: [{name: 'A<b>', meta: '12m 3s'}], more: '+5 more'}]);
+  assert.match(html, /data-kind="working"/);
+  assert.match(html, /Working<b>6<\/b>/);
+  assert.match(html, /<span>A&lt;b&gt;<\/span><time>12m 3s<\/time>/);
+  assert.match(html, /stat-more">\+5 more/);
+});

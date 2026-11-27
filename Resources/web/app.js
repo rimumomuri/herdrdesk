@@ -14,7 +14,7 @@ import { teamFlows, markWaiting } from './team-flow.js';
 import { messageTag, awaitingResponse, tagHTML } from './message-tags.js';
 import { DEFAULT_SOUNDS, newHandoffs, attentionKeys, attentionTick, playsDoneSound } from './sound-rules.js';
 import { sheep } from './sheep.js';
-import { companionState, companionSummary, featuredAgent } from './companion.js';
+import { companionState, companionSummary, featuredAgent, companionStats } from './companion.js';
 import { agentTrouble, machineTrouble } from './trouble.js';
 import { recoveryBarHTML, recoverySettingsHTML } from './recovery.js';
 import { computerRows, computerStripHTML, computerSheetHTML, cloneTeams, slotsValue, cloneRequest, mainMachineLabel } from './computers.js';
@@ -193,7 +193,15 @@ function pushCompanion(){
   const limitedTerm=live.find(term=>agentTrouble(term)==='limit');
   companionFace=featuredAgent({mood:state.mood,flash:state.flash,targetKey:state.target&&sessionKey(state.target),limitKey:limitedTerm&&sessionKey(limitedTerm),finishedKey:companionFinished,previousKey:companionFace,
     workingKeys:live.filter(workingNow).sort((a,b)=>(b.statusMs||0)-(a.statusMs||0)).map(sessionKey)});
-  const message={mood:state.mood,count:state.count,working:state.working,limited:state.limited,flash:state.flash,flashAt:state.flashAt,lines:companionSummary(state,copy),
+  // The hover stat panel: names and times only.
+  const now=Date.now(), seenWaiting=new Set();
+  const stats=companionStats({
+    working:live.filter(workingNow).map(term=>({name:term.label||term.address,since:workingSince(term,snapshot.liveTurns?.[sessionKey(term)])||now})),
+    done:live.filter(term=>!workingNow(term)&&term.status==='done'&&Number.isFinite(term.statusMs)).map(term=>({name:term.label||term.address,at:term.statusMs})),
+    waiting:companionAttention().filter(item=>!seenWaiting.has(item.address)&&seenWaiting.add(item.address))
+      .map(item=>({name:inventory.find(term=>term.address===item.address)?.label||item.team})),
+  },now,{s:copy('elapsedS'),ms:copy('elapsedMS'),hm:copy('elapsedHM')},copy);
+  const message={mood:state.mood,count:state.count,working:state.working,limited:state.limited,flash:state.flash,flashAt:state.flashAt,lines:companionSummary(state,copy),stats,
     face:companionPortrait(inventory.find(term=>sessionKey(term)===companionFace),state.mood),
     enabled:companionSettings.enabled,attentionOnly:companionSettings.attentionOnly,
     menu:{snooze:copy('companionSnooze'),off:copy('companionOff')}};
